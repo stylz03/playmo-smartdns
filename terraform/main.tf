@@ -121,8 +121,7 @@ resource "aws_instance" "smartdns" {
   user_data = templatefile("${path.module}/user_data.sh", {
     NAMED_CONF_LOCAL     = local.named_conf_local
     FIREBASE_CREDENTIALS = var.firebase_credentials != null ? var.firebase_credentials : ""
-    LAMBDA_WHITELIST_URL = var.lambda_whitelist_url != "" ? var.lambda_whitelist_url : ""
-    API_APP_PY           = file("${path.module}/../api/app.py")
+    LAMBDA_WHITELIST_URL = local.lambda_url
   })
   
   # Lambda URL will be set after Lambda is created
@@ -142,6 +141,7 @@ resource "aws_eip_association" "smartdns" {
 # IAM + Lambda for IP whitelisting
 locals {
   lambda_role_arn = var.lambda_iam_role_arn != null ? var.lambda_iam_role_arn : aws_iam_role.lambda_role[0].arn
+  lambda_url      = var.lambda_whitelist_url != "" ? var.lambda_whitelist_url : aws_lambda_function_url.whitelist.function_url
 }
 
 resource "aws_iam_role" "lambda_role" {
