@@ -58,23 +58,58 @@ jobs:
           ROLE_NAME="playmo-smartdns-dns-only-lambda-role"
           if aws iam get-role --role-name $ROLE_NAME >/dev/null 2>&1; then
             echo "Found existing IAM role: $ROLE_NAME"
-            terraform import 'aws_iam_role.lambda_role[0]' $ROLE_NAME || echo "IAM role already in state or import failed"
+            # Check if already in state
+            if terraform state show 'aws_iam_role.lambda_role[0]' >/dev/null 2>&1; then
+              echo "IAM role already in Terraform state"
+            else
+              echo "Importing IAM role into Terraform state..."
+              terraform import 'aws_iam_role.lambda_role[0]' $ROLE_NAME 2>&1 || echo "IAM role import failed"
+            fi
           else
             echo "No existing IAM role found, will create new one"
           fi
           
           # Import IAM Policy if it exists
           POLICY_NAME="playmo-smartdns-dns-only-lambda-sg-policy"
-          POLICY_ARN=$(aws iam list-policies --scope Local --query "Policies[?PolicyName=='$POLICY_NAME'].Arn" --output text 2>/dev/null || echo "")
+          # Try multiple methods to get the policy ARN
+          POLICY_ARN=$(aws iam list-policies --scope Local --query "Policies[?PolicyName=='$POLICY_NAME'].Arn" --output text 2>/dev/null | tr '\t' '\n' | head -n1 || echo "")
+          
+          # Alternative: get by account and policy name pattern
+          if [ -z "$POLICY_ARN" ] || [ "$POLICY_ARN" == "None" ]; then
+            ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "843336589038")
+            POLICY_ARN="arn:aws:iam::${ACCOUNT_ID}:policy/${POLICY_NAME}"
+            # Verify it exists
+            if ! aws iam get-policy --policy-arn "$POLICY_ARN" >/dev/null 2>&1; then
+              POLICY_ARN=""
+            fi
+          fi
           
           if [ -n "$POLICY_ARN" ] && [ "$POLICY_ARN" != "None" ] && [ "$POLICY_ARN" != "" ]; then
             echo "Found existing IAM policy: $POLICY_ARN"
-            terraform import 'aws_iam_policy.lambda_sg_policy[0]' $POLICY_ARN || echo "IAM policy already in state or import failed"
+            # Check if already in state
+            if terraform state show 'aws_iam_policy.lambda_sg_policy[0]' >/dev/null 2>&1; then
+              echo "IAM policy already in Terraform state"
+            else
+              echo "Importing IAM policy into Terraform state..."
+              if terraform import 'aws_iam_policy.lambda_sg_policy[0]' "$POLICY_ARN" 2>&1; then
+                echo "✅ Successfully imported IAM policy"
+              else
+                echo "⚠️ IAM policy import failed, but continuing..."
+              fi
+            fi
             
             # Also import the policy attachment if role exists
             if aws iam get-role --role-name $ROLE_NAME >/dev/null 2>&1; then
-              echo "Importing policy attachment"
-              terraform import 'aws_iam_role_policy_attachment.attach_lambda_policy[0]' "$ROLE_NAME/$POLICY_ARN" || echo "Policy attachment already in state or import failed"
+              if terraform state show 'aws_iam_role_policy_attachment.attach_lambda_policy[0]' >/dev/null 2>&1; then
+                echo "Policy attachment already in Terraform state"
+              else
+                echo "Importing policy attachment..."
+                if terraform import 'aws_iam_role_policy_attachment.attach_lambda_policy[0]' "$ROLE_NAME/$POLICY_ARN" 2>&1; then
+                  echo "✅ Successfully imported policy attachment"
+                else
+                  echo "⚠️ Policy attachment import failed, but continuing..."
+                fi
+              fi
             fi
           else
             echo "No existing IAM policy found, will create new one"
