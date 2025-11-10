@@ -36,6 +36,26 @@ jobs:
         run: terraform validate
         working-directory: terraform
 
+      - name: Import existing Security Group if it exists
+        run: |
+          # Get default VPC ID
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" --query 'Vpcs[0].VpcId' --output text --region us-east-2)
+          echo "Default VPC ID: $VPC_ID"
+          
+          # Check if security group exists
+          SG_ID=$(aws ec2 describe-security-groups \
+            --filters "Name=group-name,Values=playmo-smartdns-dns-only-sg" "Name=vpc-id,Values=$VPC_ID" \
+            --query 'SecurityGroups[0].GroupId' --output text --region us-east-2 2>/dev/null || echo "")
+          
+          if [ -n "$SG_ID" ] && [ "$SG_ID" != "None" ] && [ "$SG_ID" != "" ]; then
+            echo "Found existing security group: $SG_ID"
+            terraform import aws_security_group.smartdns_sg $SG_ID || echo "Security group already in state or import failed"
+          else
+            echo "No existing security group found, will create new one"
+          fi
+        working-directory: terraform
+        continue-on-error: true
+
       - name: Terraform Plan
         run: terraform plan -out=tfplan
         working-directory: terraform
