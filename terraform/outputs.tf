@@ -22,3 +22,8 @@ output "aws_region" {
   description = "AWS region where resources are deployed"
   value       = var.aws_region
 }
+
+output "api_url" {
+  description = "Public URL of the SmartDNS API"
+  value       = "http://${aws_eip.smartdns.public_ip}:5000"
+}

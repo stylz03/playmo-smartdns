@@ -79,6 +79,14 @@ resource "aws_security_group" "smartdns_sg" {
     cidr_blocks = [var.dns_cidr]
   }
 
+  ingress {
+    description = "API HTTP"
+    from_port   = 5000
+    to_port     = 5000
+    protocol    = "tcp"
+    cidr_blocks = [var.api_cidr]
+  }
+
   egress {
     description = "All"
     from_port   = 0
@@ -111,8 +119,14 @@ resource "aws_instance" "smartdns" {
   key_name               = var.key_pair_name
 
   user_data = templatefile("${path.module}/user_data.sh", {
-    NAMED_CONF_LOCAL = local.named_conf_local
+    NAMED_CONF_LOCAL     = local.named_conf_local
+    FIREBASE_CREDENTIALS = var.firebase_credentials != null ? var.firebase_credentials : ""
+    LAMBDA_WHITELIST_URL = var.lambda_whitelist_url != "" ? var.lambda_whitelist_url : ""
+    API_APP_PY           = file("${path.module}/../api/app.py")
   })
+  
+  # Lambda URL will be set after Lambda is created
+  depends_on = [aws_lambda_function_url.whitelist]
 
   tags = {
     Name = "${var.project_name}-ec2"

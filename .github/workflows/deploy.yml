@@ -194,13 +194,20 @@ jobs:
         continue-on-error: true
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan
+        run: |
+          terraform plan -out=tfplan \
+            -var="firebase_credentials=${{ secrets.FIREBASE_CREDENTIALS }}" \
+            -var="lambda_whitelist_url=${{ secrets.LAMBDA_WHITELIST_URL }}"
         working-directory: terraform
         continue-on-error: false
+        env:
+          TF_VAR_firebase_credentials: ${{ secrets.FIREBASE_CREDENTIALS }}
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
         working-directory: terraform
+        env:
+          TF_VAR_firebase_credentials: ${{ secrets.FIREBASE_CREDENTIALS }}
 
       - name: Capture Terraform Outputs
         id: tf_outputs
