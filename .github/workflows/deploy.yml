@@ -150,6 +150,30 @@ jobs:
           else
             echo "No existing Lambda function found, will create new one"
           fi
+          
+          # Import EC2 Instance if it exists (get the most recent running instance with the correct name)
+          INSTANCE_NAME="playmo-smartdns-dns-only-ec2"
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$INSTANCE_NAME" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[*].Instances[*].[InstanceId,LaunchTime]' \
+            --output text --region us-east-2 2>/dev/null | \
+            sort -k2 -r | head -n1 | awk '{print $1}' || echo "")
+          
+          if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ] && [ "$INSTANCE_ID" != "" ]; then
+            echo "Found existing EC2 instance: $INSTANCE_ID"
+            if terraform state show 'aws_instance.smartdns' >/dev/null 2>&1; then
+              echo "EC2 instance already in Terraform state"
+            else
+              echo "Importing EC2 instance into Terraform state..."
+              if terraform import 'aws_instance.smartdns' $INSTANCE_ID 2>&1; then
+                echo "✅ Successfully imported EC2 instance"
+              else
+                echo "⚠️ EC2 instance import failed, but continuing..."
+              fi
+            fi
+          else
+            echo "No existing EC2 instance found, will create new one"
+          fi
         working-directory: terraform
         continue-on-error: true
 
