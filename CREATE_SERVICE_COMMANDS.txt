@@ -1,0 +1,31 @@
+# Copy and paste this entire block into the EC2 terminal:
+
+sudo tee /etc/systemd/system/playmo-smartdns-api.service > /dev/null <<'EOFSERVICE'
+[Unit]
+Description=Playmo SmartDNS Firebase API
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/playmo-smartdns-api
+Environment="PATH=/opt/playmo-smartdns-api/venv/bin"
+Environment="FIREBASE_CREDENTIALS="
+Environment="LAMBDA_WHITELIST_URL="
+ExecStart=/opt/playmo-smartdns-api/venv/bin/gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 30 app:app
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOFSERVICE
+
+# Then run:
+sudo systemctl daemon-reload
+sudo systemctl enable playmo-smartdns-api
+sudo systemctl start playmo-smartdns-api
+sudo systemctl status playmo-smartdns-api
+
+# Test it:
+curl http://localhost:5000/health
+
