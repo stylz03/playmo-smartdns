@@ -112,6 +112,7 @@ resource "aws_instance" "smartdns" {
 # IAM + Lambda for IP whitelisting
 locals {
   lambda_role_arn = var.lambda_iam_role_arn != null ? var.lambda_iam_role_arn : aws_iam_role.lambda_role[0].arn
+  lambda_depends_on = [for item in aws_iam_role_policy_attachment.attach_lambda_policy : item]
 }
 
 resource "aws_iam_role" "lambda_role" {
@@ -195,7 +196,7 @@ resource "aws_lambda_function" "whitelist" {
       EC2_SG_ID = aws_security_group.smartdns_sg.id
     }
   }
-  depends_on = var.lambda_iam_role_arn == null ? [aws_iam_role_policy_attachment.attach_lambda_policy[0]] : []
+  depends_on = local.lambda_depends_on
 }
 
 resource "aws_lambda_function_url" "whitelist" {
