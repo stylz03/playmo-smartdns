@@ -110,7 +110,12 @@ resource "aws_instance" "smartdns" {
 }
 
 # IAM + Lambda for IP whitelisting
+locals {
+  lambda_role_arn = var.lambda_iam_role_arn != null ? var.lambda_iam_role_arn : aws_iam_role.lambda_role[0].arn
+}
+
 resource "aws_iam_role" "lambda_role" {
+  count = var.lambda_iam_role_arn == null ? 1 : 0
   name               = "${var.project_name}-lambda-role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -123,6 +128,7 @@ resource "aws_iam_role" "lambda_role" {
 }
 
 resource "aws_iam_policy" "lambda_sg_policy" {
+  count = var.lambda_iam_role_arn == null ? 1 : 0
   name        = "${var.project_name}-lambda-sg-policy"
   description = "Allow Lambda to manage SG ingress"
   policy      = jsonencode({
@@ -143,8 +149,9 @@ resource "aws_iam_policy" "lambda_sg_policy" {
 }
 
 resource "aws_iam_role_policy_attachment" "attach_lambda_policy" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = aws_iam_policy.lambda_sg_policy.arn
+  count      = var.lambda_iam_role_arn == null ? 1 : 0
+  role       = aws_iam_role.lambda_role[0].name
+  policy_arn = aws_iam_policy.lambda_sg_policy[0].arn
 }
 
 data "archive_file" "lambda_zip" {
@@ -178,7 +185,7 @@ PY
 
 resource "aws_lambda_function" "whitelist" {
   function_name = "${var.project_name}-whitelist"
-  role          = aws_iam_role.lambda_role.arn
+  role          = local.lambda_role_arn
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.12"
   filename      = data.archive_file.lambda_zip.output_path
@@ -188,7 +195,7 @@ resource "aws_lambda_function" "whitelist" {
       EC2_SG_ID = aws_security_group.smartdns_sg.id
     }
   }
-  depends_on = [aws_iam_role_policy_attachment.attach_lambda_policy]
+  depends_on = var.lambda_iam_role_arn == null ? [aws_iam_role_policy_attachment.attach_lambda_policy[0]] : []
 }
 
 resource "aws_lambda_function_url" "whitelist" {

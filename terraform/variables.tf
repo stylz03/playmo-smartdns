@@ -27,3 +27,9 @@ variable "key_pair_name" {
   type    = string
   default = null
 }
+
+variable "lambda_iam_role_arn" {
+  type        = string
+  default     = null
+  description = "Optional: ARN of existing IAM role for Lambda. If not provided, a new role will be created (requires iam:CreateRole permission)"
+}

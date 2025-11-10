@@ -32,8 +32,17 @@ jobs:
         run: terraform init
         working-directory: terraform
 
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: terraform
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+        working-directory: terraform
+        continue-on-error: false
+
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve tfplan
         working-directory: terraform
 
       - name: Capture Terraform Outputs
