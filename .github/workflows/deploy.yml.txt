@@ -1,0 +1,121 @@
+name: Deploy SmartDNS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:   # allow manual runs
+  schedule:
+    - cron: "0 7 * * *"   # run daily at 07:00 UTC for auto re-validation
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::843336589038:role/playmo-terraform-deploy
+          aws-region: us-east-2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+
+      - name: Capture Terraform Outputs
+        id: tf_outputs
+        run: |
+          echo "EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)" >> $GITHUB_ENV
+          echo "LAMBDA_URL=$(terraform output -raw lambda_function_url)" >> $GITHUB_ENV
+          echo "PROJECT_NAME=$(terraform output -raw project_name)" >> $GITHUB_ENV
+          echo "AWS_REGION=$(terraform output -raw aws_region)" >> $GITHUB_ENV
+
+      - name: Test Lambda Whitelist
+        run: |
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d '{"ip":"102.32.16.36","proto":"udp"}' \
+            "$LAMBDA_URL"
+
+      - name: Test DNS Resolution with Guard
+        run: |
+          sudo apt-get update && sudo apt-get install -y dnsutils
+          for domain in netflix.com disneyplus.com youtube.com; do
+            echo "Testing $domain against $EC2_PUBLIC_IP..."
+            result=$(dig +short $domain @$EC2_PUBLIC_IP)
+            if [ -z "$result" ]; then
+              echo "❌ DNS resolution failed for $domain"
+              exit 1
+            else
+              echo "✅ $domain resolved to $result"
+            fi
+          done
+
+      - name: Notify Slack on Success
+        if: success() && github.event_name != 'schedule'
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data "{
+            \"blocks\": [
+              {\"type\": \"header\", \"text\": {\"type\": \"plain_text\", \"text\": \"🚀 SmartDNS Deployment Succeeded\"}},
+              {\"type\": \"section\", \"fields\": [
+                {\"type\": \"mrkdwn\", \"text\": \"*Project:* $PROJECT_NAME\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Region:* $AWS_REGION\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*EC2 IP:* $EC2_PUBLIC_IP\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Lambda URL:* $LAMBDA_URL\"}
+              ]},
+              {\"type\": \"actions\", \"elements\": [
+                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"View GitHub Run\"}, \"url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}
+              ]}
+            ]
+          }" \
+          ${{ secrets.SLACK_SUCCESS_WEBHOOK }}
+
+      - name: Notify Slack on Failure
+        if: failure() && github.event_name != 'schedule'
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data "{
+            \"blocks\": [
+              {\"type\": \"header\", \"text\": {\"type\": \"plain_text\", \"text\": \"🔥 SmartDNS Deployment Failed\"}},
+              {\"type\": \"section\", \"fields\": [
+                {\"type\": \"mrkdwn\", \"text\": \"*Project:* $PROJECT_NAME\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Region:* $AWS_REGION\"}
+              ]},
+              {\"type\": \"actions\", \"elements\": [
+                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"View GitHub Run\"}, \"url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}
+              ]}
+            ]
+          }" \
+          ${{ secrets.SLACK_FAILURE_WEBHOOK }}
+
+      - name: Notify Slack Heartbeat
+        if: github.event_name == 'schedule'
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+          --data "{
+            \"blocks\": [
+              {\"type\": \"header\", \"text\": {\"type\": \"plain_text\", \"text\": \"🕒 SmartDNS Daily Validation\"}},
+              {\"type\": \"section\", \"fields\": [
+                {\"type\": \"mrkdwn\", \"text\": \"*Project:* $PROJECT_NAME\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Region:* $AWS_REGION\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*EC2 IP:* $EC2_PUBLIC_IP\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Lambda URL:* $LAMBDA_URL\"}
+              ]},
+              {\"type\": \"actions\", \"elements\": [
+                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"View GitHub Run\"}, \"url\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}
+              ]}
+            ]
+          }" \
+          ${{ secrets.SLACK_HEARTBEAT_WEBHOOK }}
