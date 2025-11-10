@@ -36,13 +36,13 @@ jobs:
         run: terraform validate
         working-directory: terraform
 
-      - name: Import existing Security Group if it exists
+      - name: Import existing resources if they exist
         run: |
           # Get default VPC ID
           VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" --query 'Vpcs[0].VpcId' --output text --region us-east-2)
           echo "Default VPC ID: $VPC_ID"
           
-          # Check if security group exists
+          # Import Security Group if it exists
           SG_ID=$(aws ec2 describe-security-groups \
             --filters "Name=group-name,Values=playmo-smartdns-dns-only-sg" "Name=vpc-id,Values=$VPC_ID" \
             --query 'SecurityGroups[0].GroupId' --output text --region us-east-2 2>/dev/null || echo "")
@@ -52,6 +52,32 @@ jobs:
             terraform import aws_security_group.smartdns_sg $SG_ID || echo "Security group already in state or import failed"
           else
             echo "No existing security group found, will create new one"
+          fi
+          
+          # Import IAM Role if it exists (IAM is global, no region needed)
+          ROLE_NAME="playmo-smartdns-dns-only-lambda-role"
+          if aws iam get-role --role-name $ROLE_NAME >/dev/null 2>&1; then
+            echo "Found existing IAM role: $ROLE_NAME"
+            terraform import 'aws_iam_role.lambda_role[0]' $ROLE_NAME || echo "IAM role already in state or import failed"
+          else
+            echo "No existing IAM role found, will create new one"
+          fi
+          
+          # Import IAM Policy if it exists
+          POLICY_NAME="playmo-smartdns-dns-only-lambda-sg-policy"
+          POLICY_ARN=$(aws iam list-policies --scope Local --query "Policies[?PolicyName=='$POLICY_NAME'].Arn" --output text 2>/dev/null || echo "")
+          
+          if [ -n "$POLICY_ARN" ] && [ "$POLICY_ARN" != "None" ] && [ "$POLICY_ARN" != "" ]; then
+            echo "Found existing IAM policy: $POLICY_ARN"
+            terraform import 'aws_iam_policy.lambda_sg_policy[0]' $POLICY_ARN || echo "IAM policy already in state or import failed"
+            
+            # Also import the policy attachment if role exists
+            if aws iam get-role --role-name $ROLE_NAME >/dev/null 2>&1; then
+              echo "Importing policy attachment"
+              terraform import 'aws_iam_role_policy_attachment.attach_lambda_policy[0]' "$ROLE_NAME/$POLICY_ARN" || echo "Policy attachment already in state or import failed"
+            fi
+          else
+            echo "No existing IAM policy found, will create new one"
           fi
         working-directory: terraform
         continue-on-error: true
