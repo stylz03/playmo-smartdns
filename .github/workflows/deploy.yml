@@ -30,9 +30,11 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
+        working-directory: terraform
 
       - name: Terraform Apply
         run: terraform apply -auto-approve
+        working-directory: terraform
 
       - name: Capture Terraform Outputs
         id: tf_outputs
@@ -41,6 +43,7 @@ jobs:
           echo "LAMBDA_URL=$(terraform output -raw lambda_function_url)" >> $GITHUB_ENV
           echo "PROJECT_NAME=$(terraform output -raw project_name)" >> $GITHUB_ENV
           echo "AWS_REGION=$(terraform output -raw aws_region)" >> $GITHUB_ENV
+        working-directory: terraform
 
       - name: Test Lambda Whitelist
         run: |
