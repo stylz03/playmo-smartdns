@@ -114,6 +114,42 @@ jobs:
           else
             echo "No existing IAM policy found, will create new one"
           fi
+          
+          # Import Lambda Function if it exists
+          LAMBDA_FUNCTION_NAME="playmo-smartdns-dns-only-whitelist"
+          if aws lambda get-function --function-name $LAMBDA_FUNCTION_NAME --region us-east-2 >/dev/null 2>&1; then
+            echo "Found existing Lambda function: $LAMBDA_FUNCTION_NAME"
+            if terraform state show 'aws_lambda_function.whitelist' >/dev/null 2>&1; then
+              echo "Lambda function already in Terraform state"
+            else
+              echo "Importing Lambda function into Terraform state..."
+              if terraform import 'aws_lambda_function.whitelist' $LAMBDA_FUNCTION_NAME 2>&1; then
+                echo "✅ Successfully imported Lambda function"
+                
+                # Also import Lambda function URL if it exists
+                if terraform state show 'aws_lambda_function_url.whitelist' >/dev/null 2>&1; then
+                  echo "Lambda function URL already in Terraform state"
+                else
+                  echo "Importing Lambda function URL..."
+                  # Lambda function URL import uses the function name
+                  terraform import 'aws_lambda_function_url.whitelist' $LAMBDA_FUNCTION_NAME 2>&1 || echo "Lambda function URL import failed (may not exist yet)"
+                fi
+                
+                # Also import Lambda permission if it exists
+                if terraform state show 'aws_lambda_permission.allow_public_url' >/dev/null 2>&1; then
+                  echo "Lambda permission already in Terraform state"
+                else
+                  echo "Importing Lambda permission..."
+                  # Lambda permission import format: function_name/statement_id
+                  terraform import 'aws_lambda_permission.allow_public_url' "$LAMBDA_FUNCTION_NAME/AllowPublicFunctionUrlInvoke" 2>&1 || echo "Lambda permission import failed (may not exist yet)"
+                fi
+              else
+                echo "⚠️ Lambda function import failed, but continuing..."
+              fi
+            fi
+          else
+            echo "No existing Lambda function found, will create new one"
+          fi
         working-directory: terraform
         continue-on-error: true
 
