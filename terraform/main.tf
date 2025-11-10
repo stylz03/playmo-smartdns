@@ -92,6 +92,16 @@ resource "aws_security_group" "smartdns_sg" {
   }
 }
 
+# Elastic IP for static public IP
+resource "aws_eip" "smartdns" {
+  domain = "vpc"
+  
+  tags = {
+    Name = "${var.project_name}-eip"
+    Project = var.project_name
+  }
+}
+
 # EC2 instance
 resource "aws_instance" "smartdns" {
   ami                    = data.aws_ami.ubuntu.id
@@ -107,6 +117,12 @@ resource "aws_instance" "smartdns" {
   tags = {
     Name = "${var.project_name}-ec2"
   }
+}
+
+# Associate Elastic IP with EC2 instance
+resource "aws_eip_association" "smartdns" {
+  instance_id   = aws_instance.smartdns.id
+  allocation_id = aws_eip.smartdns.id
 }
 
 # IAM + Lambda for IP whitelisting

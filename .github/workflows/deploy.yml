@@ -167,6 +167,22 @@ jobs:
               echo "Importing EC2 instance into Terraform state..."
               if terraform import 'aws_instance.smartdns' $INSTANCE_ID 2>&1; then
                 echo "✅ Successfully imported EC2 instance"
+                
+                # Check if instance has an Elastic IP and import it
+                EIP_ALLOCATION=$(aws ec2 describe-addresses \
+                  --filters "Name=instance-id,Values=$INSTANCE_ID" \
+                  --query 'Addresses[0].AllocationId' \
+                  --output text --region us-east-2 2>/dev/null || echo "")
+                
+                if [ -n "$EIP_ALLOCATION" ] && [ "$EIP_ALLOCATION" != "None" ] && [ "$EIP_ALLOCATION" != "" ]; then
+                  echo "Found Elastic IP: $EIP_ALLOCATION"
+                  if terraform state show 'aws_eip.smartdns' >/dev/null 2>&1; then
+                    echo "Elastic IP already in Terraform state"
+                  else
+                    echo "Importing Elastic IP..."
+                    terraform import 'aws_eip.smartdns' $EIP_ALLOCATION 2>&1 || echo "Elastic IP import failed"
+                  fi
+                fi
               else
                 echo "⚠️ EC2 instance import failed, but continuing..."
               fi

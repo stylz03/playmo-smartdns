@@ -1,6 +1,11 @@
 output "ec2_public_ip" {
-  description = "Public IP of the SmartDNS EC2 instance"
-  value       = aws_instance.smartdns.public_ip
+  description = "Public IP (Elastic IP) of the SmartDNS EC2 instance"
+  value       = aws_eip.smartdns.public_ip
+}
+
+output "ec2_elastic_ip" {
+  description = "Elastic IP address (static) of the SmartDNS EC2 instance"
+  value       = aws_eip.smartdns.public_ip
 }
 
 output "lambda_function_url" {
