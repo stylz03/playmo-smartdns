@@ -35,6 +35,10 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
         working-directory: terraform
+        env:
+          # Provide default values for variables during validation
+          TF_VAR_use_existing_eip: "false"
+          TF_VAR_existing_eip_address: "3.151.46.11"
 
       - name: Import existing resources if they exist
         run: |
