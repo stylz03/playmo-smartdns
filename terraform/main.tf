@@ -12,12 +12,24 @@ provider "aws" {
   region = var.aws_region
 }
 
-# Load streaming domains
+# Load streaming domains and US CDN IPs
 locals {
   streaming_domains = jsondecode(file("${path.module}/../services.json"))
   domain_list       = [for k, v in local.streaming_domains : k if v]
-  named_conf_local  = join("\n\n", [
+  us_cdn_ips        = jsondecode(file("${path.module}/us-cdn-ips.json"))
+  
+  # Generate BIND9 zone configuration
+  # Use static A records for domains with US CDN IPs, forward for others
+  named_conf_local = join("\n\n", [
     for d in local.domain_list :
+    contains(keys(local.us_cdn_ips), d) ? 
+    <<EOT
+zone "${d}" {
+    type master;
+    file "/etc/bind/zones/db.${replace(d, ".", "_")}";
+};
+EOT
+    :
     <<EOT
 zone "${d}" {
     type forward;
@@ -26,6 +38,43 @@ zone "${d}" {
 };
 EOT
   ])
+  
+  # Generate zone file contents for domains with static IPs
+  zone_files = {
+    for d in local.domain_list :
+    d => contains(keys(local.us_cdn_ips), d) ? join("\n", [
+      "\$TTL    604800",
+      "@       IN      SOA     ns1.smartdns.local. admin.smartdns.local. (",
+      "                        ${formatdate("YYYYMMDDHH", timestamp())}         ; Serial",
+      "                        604800             ; Refresh",
+      "                        86400              ; Retry",
+      "                        2419200            ; Expire",
+      "                        604800 )           ; Negative Cache TTL",
+      ";",
+      "@       IN      NS      ns1.smartdns.local.",
+      join("\n", [for ip in local.us_cdn_ips[d] : "@       IN      A       ${ip}"])
+    ]) : null
+  }
+}
+  # BIND9 options optimized for US-based SmartDNS
+  # Since EC2 is in us-east-2 (Ohio, USA), queries from BIND9 will appear
+  # to come from US location, making upstream DNS return US IPs
+  named_conf_options = <<EOF
+options {
+    directory "/var/cache/bind";
+    recursion yes;
+    allow-query { any; };
+    allow-recursion { any; };
+    dnssec-validation auto;
+    listen-on { any; };
+    listen-on-v6 { any; };
+    # Ensure queries use the EC2's public IP (US-based)
+    # This makes upstream DNS resolvers see queries from US location
+    query-source address *;
+    # No global forwarders - streaming domains use zone-specific forwarding
+    # Non-streaming domains use normal recursive resolution
+};
+EOF
 }
 
 # Ubuntu AMI in us-east-2
@@ -87,6 +136,14 @@ resource "aws_security_group" "smartdns_sg" {
     cidr_blocks = [var.api_cidr]
   }
 
+  ingress {
+    description = "Proxy HTTP (Squid)"
+    from_port   = 3128
+    to_port     = 3128
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # Will be restricted by Squid ACLs based on whitelisted IPs
+  }
+
   egress {
     description = "All"
     from_port   = 0
@@ -120,8 +177,11 @@ resource "aws_instance" "smartdns" {
 
   user_data = templatefile("${path.module}/user_data.sh", {
     NAMED_CONF_LOCAL     = local.named_conf_local
+    NAMED_CONF_OPTIONS   = local.named_conf_options
+    ZONE_FILES           = jsonencode(local.zone_files)
     FIREBASE_CREDENTIALS = var.firebase_credentials != null ? var.firebase_credentials : ""
     LAMBDA_WHITELIST_URL = local.lambda_url
+    SECURITY_GROUP_ID    = aws_security_group.smartdns_sg.id
   })
   
   # Lambda URL will be set after Lambda is created
@@ -195,16 +255,34 @@ def lambda_handler(event, context):
     try:
         if isinstance(event, str): event = json.loads(event)
         ip = event.get("ip")
-        proto = event.get("proto","udp")
         if not ip: return {"status":"error","message":"missing ip"}
-        port = 53
-        ec2.authorize_security_group_ingress(
-            GroupId=EC2_SG_ID,
-            IpProtocol=proto,
-            FromPort=port, ToPort=port,
-            CidrIp=f"{ip}/32"
-        )
-        return {"status":"ok","message":f"whitelisted {ip} for DNS {proto.upper()}"}
+        
+        # Whitelist DNS ports (UDP and TCP)
+        for proto in ["udp", "tcp"]:
+            try:
+                ec2.authorize_security_group_ingress(
+                    GroupId=EC2_SG_ID,
+                    IpProtocol=proto,
+                    FromPort=53, ToPort=53,
+                    CidrIp=f"{ip}/32"
+                )
+            except Exception as e:
+                if "already exists" not in str(e).lower():
+                    raise
+        
+        # Whitelist proxy port (TCP)
+        try:
+            ec2.authorize_security_group_ingress(
+                GroupId=EC2_SG_ID,
+                IpProtocol="tcp",
+                FromPort=3128, ToPort=3128,
+                CidrIp=f"{ip}/32"
+            )
+        except Exception as e:
+            if "already exists" not in str(e).lower():
+                raise
+        
+        return {"status":"ok","message":f"whitelisted {ip} for DNS and proxy"}
     except Exception as e:
         return {"status":"error","message":str(e)}
 PY

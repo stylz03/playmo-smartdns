@@ -1,0 +1,12 @@
+# Example: US-based DNS resolvers configuration
+# This file shows how to configure BIND9 to use US-based DNS resolvers
+# instead of Google DNS for geo-unblocking
+
+# Option 1: Use US-based public DNS resolvers
+# Note: Most public DNS resolvers return IPs based on query source location
+# For true SmartDNS, you need a SmartDNS provider's DNS servers
+
+# Option 2: Use static A records (recommended)
+# Configure BIND9 to return specific US CDN IPs for streaming domains
+# This is more reliable and doesn't depend on external DNS resolvers
+

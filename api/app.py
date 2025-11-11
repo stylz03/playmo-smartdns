@@ -7,6 +7,7 @@ REST API for managing clients, IP whitelisting, and Firestore operations
 import os
 import json
 import logging
+import subprocess
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -42,6 +43,7 @@ except Exception as e:
 
 # Lambda function URL for IP whitelisting
 LAMBDA_WHITELIST_URL = os.environ.get('LAMBDA_WHITELIST_URL', '')
+SECURITY_GROUP_ID = os.environ.get('SECURITY_GROUP_ID', '')
 
 # Collections
 COLLECTION_CLIENTS = 'clients'
@@ -236,13 +238,28 @@ def add_client_ip(client_id):
             try:
                 whitelist_response = requests.post(
                     LAMBDA_WHITELIST_URL,
-                    json={'ip': ip_address, 'proto': 'udp'},
+                    json={'ip': ip_address},
                     timeout=5
                 )
                 if whitelist_response.status_code == 200:
                     # Update IP document with whitelist status
                     ip_doc_data['is_whitelisted'] = True
                     ip_doc_data['whitelisted_at'] = firestore.SERVER_TIMESTAMP
+                    
+                    # Update Squid ACL with whitelisted IPs
+                    if SECURITY_GROUP_ID:
+                        try:
+                            subprocess.run(
+                                ['/usr/local/bin/update-squid-acl.sh', SECURITY_GROUP_ID],
+                                check=True,
+                                timeout=10,
+                                capture_output=True
+                            )
+                            logger.info(f"Updated Squid ACL for IP {ip_address}")
+                        except subprocess.CalledProcessError as e:
+                            logger.warning(f"Failed to update Squid ACL: {e}")
+                        except Exception as e:
+                            logger.warning(f"Error updating Squid ACL: {e}")
             except Exception as e:
                 logger.warning(f"Failed to whitelist IP via Lambda: {e}")
         
