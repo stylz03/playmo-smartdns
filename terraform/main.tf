@@ -223,7 +223,11 @@ resource "aws_instance" "smartdns" {
 # Associate Elastic IP with EC2 instance
 resource "aws_eip_association" "smartdns" {
   instance_id   = aws_instance.smartdns.id
-  allocation_id = aws_eip.smartdns.id
+  allocation_id = local.eip_allocation_id
+  
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # IAM + Lambda for IP whitelisting
