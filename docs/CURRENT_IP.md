@@ -15,15 +15,15 @@
 ## Client Configuration
 
 ### DNS Settings
-Set your device DNS to: **3.151.75.152**
+Set your device DNS to: **3.151.46.11**
 
 ### Proxy Settings (for streaming domains)
-- **Proxy hostname:** `3.151.75.152`
+- **Proxy hostname:** `3.151.46.11`
 - **Proxy port:** `3128`
 
 ### API Endpoint
-- **Base URL:** `http://3.151.75.152:5000`
-- **Health check:** `http://3.151.75.152:5000/health`
+- **Base URL:** `http://3.151.46.11:5000`
+- **Health check:** `http://3.151.46.11:5000/health`
 
 ## Quick Test Commands
 
