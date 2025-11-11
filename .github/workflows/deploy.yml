@@ -304,15 +304,21 @@ jobs:
             # Get EC2 public IP
             EC2_IP=$(terraform output -raw ec2_public_ip 2>&1 | grep -v "::debug::" | grep -v "Terraform exited" | grep -v "stdout:" | grep -v "stderr:" | grep -v "exitcode:" | tr -d '\n\r' | head -c 50 || echo "")
             
-            # Download sync script to instance
+            # Download sync script to instance (with GitHub token if available)
             echo "Downloading sync script to EC2..."
+            GITHUB_TOKEN_VAL="${{ secrets.GITHUB_TOKEN }}"
+            if [ -n "$GITHUB_TOKEN_VAL" ]; then
+              CURL_CMD="curl -s -f --max-time 30 --retry 3 -H 'Authorization: token $GITHUB_TOKEN_VAL'"
+            else
+              CURL_CMD="curl -s -f --max-time 30 --retry 3"
+            fi
             aws ssm send-command \
               --instance-ids "$INSTANCE_ID" \
               --document-name "AWS-RunShellScript" \
               --parameters "commands=[
-                'curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-sniproxy-config.sh -o /tmp/sync-sniproxy-config.sh',
+                '$CURL_CMD https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-sniproxy-config.sh -o /tmp/sync-sniproxy-config.sh',
                 'chmod +x /tmp/sync-sniproxy-config.sh',
-                'curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json -o /tmp/services.json',
+                '$CURL_CMD https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json -o /tmp/services.json',
                 'EC2_IP=$EC2_IP /tmp/sync-sniproxy-config.sh /tmp/services.json /etc/sniproxy/sniproxy.conf'
               ]" \
               --region us-east-2 \
