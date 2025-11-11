@@ -63,6 +63,12 @@ fi
 # Create Nginx stream config directory
 mkdir -p /etc/nginx/conf.d
 
+# Disable default nginx site to avoid port 80 conflict with stream block
+if [ -L /etc/nginx/sites-enabled/default ] || [ -f /etc/nginx/sites-enabled/default ]; then
+    rm -f /etc/nginx/sites-enabled/default
+    echo "✅ Disabled default nginx site (to avoid port 80 conflict)"
+fi
+
 # Download sync script for Nginx stream config (with timeout and retry)
 echo "Downloading Nginx stream config sync script..."
 if [ -n "${GITHUB_TOKEN}" ]; then
