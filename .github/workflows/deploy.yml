@@ -193,6 +193,37 @@ jobs:
         working-directory: terraform
         continue-on-error: true
 
+      - name: Clean up unused Elastic IPs
+        run: |
+          echo "Checking for unused Elastic IPs in us-east-2..."
+          # Get all unassociated EIPs
+          UNUSED_EIPS=$(aws ec2 describe-addresses \
+            --region us-east-2 \
+            --filters "Name=domain,Values=vpc" \
+            --query 'Addresses[?AssociationId==`null`].[AllocationId,PublicIp]' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$UNUSED_EIPS" ]; then
+            echo "$UNUSED_EIPS" | while read ALLOC_ID EIP_IP; do
+              if [ -n "$ALLOC_ID" ] && [ "$ALLOC_ID" != "None" ]; then
+                echo "Found unused EIP: $EIP_IP (Allocation: $ALLOC_ID)"
+                # Check if this is the old EIP we want to keep
+                if [ "$EIP_IP" = "3.151.46.11" ]; then
+                  echo "Keeping old EIP $EIP_IP for potential reuse"
+                else
+                  echo "Releasing unused EIP: $EIP_IP"
+                  aws ec2 release-address \
+                    --region us-east-2 \
+                    --allocation-id "$ALLOC_ID" 2>&1 || echo "Failed to release $EIP_IP"
+                fi
+              fi
+            done
+          else
+            echo "No unused Elastic IPs found"
+          fi
+        working-directory: terraform
+        continue-on-error: true
+
       - name: Check for existing Elastic IP
         id: check_eip
         run: |

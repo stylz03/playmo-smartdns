@@ -182,8 +182,8 @@ resource "aws_eip" "smartdns" {
 
 # Local to determine which EIP to use
 locals {
-  eip_allocation_id = var.use_existing_eip ? data.aws_eip.existing[0].id : aws_eip.smartdns[0].id
-  eip_public_ip     = var.use_existing_eip ? data.aws_eip.existing[0].public_ip : aws_eip.smartdns[0].public_ip
+  eip_allocation_id = var.use_existing_eip && length(data.aws_eip.existing) > 0 ? data.aws_eip.existing[0].id : (length(aws_eip.smartdns) > 0 ? aws_eip.smartdns[0].id : null)
+  eip_public_ip     = var.use_existing_eip && length(data.aws_eip.existing) > 0 ? data.aws_eip.existing[0].public_ip : (length(aws_eip.smartdns) > 0 ? aws_eip.smartdns[0].public_ip : null)
 }
 
 # EC2 instance
