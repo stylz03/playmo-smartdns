@@ -118,12 +118,28 @@ CLIENT_IP=$CLIENT_IP
 ADDED_DATE=$(date)
 EOF
 
+# Generate QR code if qrencode is available
+QR_CODE_FILE="/tmp/${CLIENT_NAME}.png"
+QR_CODE_TXT="/tmp/${CLIENT_NAME}-qr.txt"
+if command -v qrencode >/dev/null 2>&1; then
+    echo ""
+    echo "Step 4: Generating QR code..."
+    qrencode -t PNG -o "$QR_CODE_FILE" < "$CLIENT_CONFIG_FILE"
+    qrencode -t ANSIUTF8 < "$CLIENT_CONFIG_FILE" > "$QR_CODE_TXT" 2>/dev/null || true
+    echo "✅ QR code generated: $QR_CODE_FILE"
+    echo "✅ QR code (text): $QR_CODE_TXT"
+fi
+
 echo ""
 echo "=========================================="
 echo "✅ Client Setup Complete!"
 echo "=========================================="
 echo ""
 echo "Client Configuration File: $CLIENT_CONFIG_FILE"
+if [ -f "$QR_CODE_FILE" ]; then
+    echo "QR Code (PNG): $QR_CODE_FILE"
+    echo "QR Code (Text): $QR_CODE_TXT"
+fi
 echo ""
 echo "Client Information:"
 echo "  Name: $CLIENT_NAME"
@@ -131,17 +147,30 @@ echo "  IP: $CLIENT_IP"
 echo "  Public Key: $CLIENT_PUBLIC_KEY"
 echo ""
 echo "Next Steps:"
-echo "1. Download the config file:"
-echo "   scp ubuntu@$(echo $SERVER_ENDPOINT | cut -d: -f1):$CLIENT_CONFIG_FILE ."
+echo "1. Share with customer:"
+if [ -f "$QR_CODE_FILE" ]; then
+    echo "   - QR Code (PNG): Download $QR_CODE_FILE"
+    echo "   - QR Code (Text): View $QR_CODE_TXT"
+    echo "   - Config File: Download $CLIENT_CONFIG_FILE"
+else
+    echo "   - Download config: $CLIENT_CONFIG_FILE"
+fi
 echo ""
-echo "2. Import into WireGuard app:"
-echo "   - Android/iOS: Use WireGuard app"
-echo "   - Windows/Mac: Use WireGuard client"
+echo "2. Customer imports into WireGuard app:"
+echo "   - Android/iOS: Scan QR code or import file"
+echo "   - Windows/Mac: Import config file"
 echo ""
-echo "3. Connect and test streaming apps"
+echo "3. Customer connects and tests streaming apps"
 echo ""
 echo "4. For browsers, set DNS to: 3.151.46.11"
 echo ""
+if [ -f "$QR_CODE_TXT" ]; then
+    echo "=========================================="
+    echo "QR Code (scan with WireGuard app):"
+    echo "=========================================="
+    cat "$QR_CODE_TXT"
+    echo ""
+fi
 echo "Current WireGuard peers:"
 sudo wg show
 
