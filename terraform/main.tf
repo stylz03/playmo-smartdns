@@ -161,6 +161,11 @@ resource "aws_security_group" "smartdns_sg" {
 resource "aws_eip" "smartdns" {
   domain = "vpc"
   
+  lifecycle {
+    prevent_destroy = false  # Allow destroy, but prefer to keep it
+    create_before_destroy = false
+  }
+  
   tags = {
     Name = "${var.project_name}-eip"
     Project = var.project_name
@@ -185,6 +190,16 @@ resource "aws_instance" "smartdns" {
   
   # Lambda URL will be set after Lambda is created
   depends_on = [aws_lambda_function_url.whitelist]
+
+  lifecycle {
+    # Prevent unnecessary recreation - only recreate if AMI or instance type changes
+    create_before_destroy = true
+    ignore_changes = [
+      # Ignore changes to user_data after initial creation (to allow manual updates)
+      # Uncomment if you want to prevent user_data changes from triggering recreation:
+      # user_data,
+    ]
+  }
 
   tags = {
     Name = "${var.project_name}-ec2"
