@@ -14,7 +14,7 @@ EOF
 mkdir -p /etc/bind/zones
 
 # Create zone files for domains with static US CDN IPs
-if [ -n "${ZONE_FILES}" ] && [ "${ZONE_FILES}" != "null" ]; then
+if [ -n "$${ZONE_FILES}" ] && [ "$${ZONE_FILES}" != "null" ]; then
     echo "Creating zone files for static US CDN IPs..."
     # Write JSON to temp file, then parse it
     echo '${ZONE_FILES}' > /tmp/zone_files.json
@@ -152,17 +152,17 @@ cat > /usr/local/bin/update-squid-acl.sh <<'UPDATE_SCRIPT'
 # Update Squid ACL with whitelisted IPs from security group
 # This script is called by the API when IPs are whitelisted
 
-SECURITY_GROUP_ID="${1:-}"
-if [ -z "$SECURITY_GROUP_ID" ]; then
-    echo "Usage: $0 <security-group-id>"
+SECURITY_GROUP_ID="$${1:-}"
+if [ -z "$$SECURITY_GROUP_ID" ]; then
+    echo "Usage: $$0 <security-group-id>"
     exit 1
 fi
 
 # Get whitelisted IPs from security group (port 3128)
 aws ec2 describe-security-groups \
-    --group-ids "$SECURITY_GROUP_ID" \
+    --group-ids "$$SECURITY_GROUP_ID" \
     --query 'SecurityGroups[0].IpPermissions[?FromPort==`3128`].IpRanges[*].CidrIp' \
-    --output text | tr '\t' '\n' | sed 's/\/32$//' > /tmp/whitelisted-ips.txt
+    --output text | tr '\t' '\n' | sed 's/\/32$$//' > /tmp/whitelisted-ips.txt
 
 # Update Squid ACL file
 mv /tmp/whitelisted-ips.txt /etc/squid/whitelisted-ips.txt
