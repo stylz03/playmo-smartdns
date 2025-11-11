@@ -4,8 +4,7 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'services.json'  # Trigger on services.json changes for sniproxy sync
+    # paths: removed to trigger on all changes to main branch
   workflow_dispatch:   # allow manual runs
   schedule:
     - cron: "0 7 * * *"   # run daily at 07:00 UTC for auto re-validation
