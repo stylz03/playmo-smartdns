@@ -43,7 +43,7 @@ EOT
   zone_files = {
     for d in local.domain_list :
     d => contains(keys(local.us_cdn_ips), d) ? join("\n", [
-      "\$TTL    604800",
+      "$$TTL    604800",
       "@       IN      SOA     ns1.smartdns.local. admin.smartdns.local. (",
       "                        ${formatdate("YYYYMMDDHH", timestamp())}         ; Serial",
       "                        604800             ; Refresh",
@@ -55,7 +55,7 @@ EOT
       join("\n", [for ip in local.us_cdn_ips[d] : "@       IN      A       ${ip}"])
     ]) : null
   }
-}
+  
   # BIND9 options optimized for US-based SmartDNS
   # Since EC2 is in us-east-2 (Ohio, USA), queries from BIND9 will appear
   # to come from US location, making upstream DNS return US IPs
