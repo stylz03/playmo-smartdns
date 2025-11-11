@@ -1,0 +1,36 @@
+# Fix BIND9 and API Service - Run these commands on EC2
+
+# 1. Fix BIND9 to listen on all interfaces
+sudo bash -c 'cat > /etc/bind/named.conf.options <<"EOF"
+options {
+    directory "/var/cache/bind";
+    recursion yes;
+    allow-query { any; };
+    allow-recursion { any; };
+    dnssec-validation auto;
+    listen-on port 53 { any; };
+    listen-on-v6 port 53 { any; };
+    query-source address *;
+};
+EOF'
+sudo named-checkconf && sudo systemctl restart bind9
+
+# 2. Check if API service exists
+sudo systemctl status playmo-smartdns-api
+
+# 3. If service exists, start it
+sudo systemctl start playmo-smartdns-api
+sudo systemctl enable playmo-smartdns-api
+
+# 4. If service doesn't exist, check if app.py exists
+ls -la /opt/playmo-smartdns-api/app.py
+
+# 5. Verify services are listening
+sudo ss -tulnp | grep -E '53|5000'
+
+# 6. Test API locally
+curl http://localhost:5000/health
+
+# 7. Test DNS locally
+dig @127.0.0.1 netflix.com +short
+
