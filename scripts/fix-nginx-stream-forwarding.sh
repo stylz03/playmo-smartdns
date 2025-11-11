@@ -6,7 +6,7 @@ set -e
 
 echo "=========================================="
 echo "Fixing Nginx Stream Forwarding"
-echo "==========================================
+echo "=========================================="
 
 # Stop nginx
 systemctl stop nginx 2>/dev/null || true
@@ -83,7 +83,7 @@ cat >> /etc/nginx/stream.conf <<'EOF'
         ssl_preread on;
         proxy_timeout 1s;
         proxy_responses 0;
-        proxy_bind $remote_addr transparent;
+        # proxy_bind $remote_addr transparent;  # Requires root or special permissions
     }
 
     # HTTP listener (port 80)
@@ -93,7 +93,7 @@ cat >> /etc/nginx/stream.conf <<'EOF'
         proxy_protocol off;
         proxy_timeout 1s;
         proxy_responses 0;
-        proxy_bind $remote_addr transparent;
+        # proxy_bind $remote_addr transparent;  # Requires root or special permissions
     }
 }
 EOF
