@@ -167,15 +167,21 @@ sudo chown root:root /etc/sniproxy/sniproxy.conf
 # Verify
 echo ""
 echo "Verifying config..."
-if grep -q "roto" /etc/sniproxy/sniproxy.conf; then
-    echo "❌ ERROR: Still found 'roto' in config!"
-    echo "File content around 'roto':"
-    grep -n "roto" /etc/sniproxy/sniproxy.conf || true
+# Check for actual corruption: "roto" as a standalone word (not part of "proto")
+if grep -qE "^[[:space:]]*roto[[:space:]]" /etc/sniproxy/sniproxy.conf || grep -qE "[[:space:]]roto[[:space:]]" /etc/sniproxy/sniproxy.conf; then
+    echo "❌ ERROR: Found corrupted 'roto' (not 'proto') in config!"
+    echo "File content around corrupted 'roto':"
+    grep -nE "^[[:space:]]*roto[[:space:]]|[[:space:]]roto[[:space:]]" /etc/sniproxy/sniproxy.conf || true
     exit 1
 fi
 
 if ! grep -q "proto tls" /etc/sniproxy/sniproxy.conf; then
     echo "❌ ERROR: 'proto tls' not found!"
+    exit 1
+fi
+
+if ! grep -q "proto http" /etc/sniproxy/sniproxy.conf; then
+    echo "❌ ERROR: 'proto http' not found!"
     exit 1
 fi
 
