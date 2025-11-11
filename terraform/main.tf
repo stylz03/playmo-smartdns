@@ -213,8 +213,7 @@ resource "aws_instance" "smartdns" {
       # This prevents user_data changes from triggering instance recreation
       user_data,
     ]
-    # Prevent destroy if instance exists
-    prevent_destroy = length(data.aws_instances.existing.ids) > 0 ? true : false
+    # Note: prevent_destroy cannot use computed values, so we rely on count=0 to prevent creation
   }
 
   tags = {
