@@ -52,7 +52,7 @@ echo "Installing sniproxy..."
 cd /tmp
 git clone https://github.com/dlundquist/sniproxy.git || echo "sniproxy repo already exists"
 cd sniproxy
-if [ ! -f /usr/sbin/sniproxy ]; then
+if [ ! -f /usr/local/sbin/sniproxy ]; then
     ./autogen.sh
     ./configure
     make
@@ -95,7 +95,7 @@ After=network.target
 [Service]
 Type=forking
 User=sniproxy
-ExecStart=/usr/sbin/sniproxy -c /etc/sniproxy/sniproxy.conf
+ExecStart=/usr/local/sbin/sniproxy -c /etc/sniproxy/sniproxy.conf
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=10
