@@ -69,8 +69,6 @@ cat >> "$NGINX_STREAM_CONF_TMP" <<'EOF'
     # HTTPS listener (port 443)
     server {
         listen 443;
-        resolver 8.8.8.8 8.8.4.4 1.1.1.1 valid=300s;
-        resolver_timeout 5s;
         proxy_pass $ssl_target;
         proxy_protocol off;
         ssl_preread on;
@@ -81,8 +79,6 @@ cat >> "$NGINX_STREAM_CONF_TMP" <<'EOF'
     # HTTP listener (port 80)
     server {
         listen 80;
-        resolver 8.8.8.8 8.8.4.4 1.1.1.1 valid=300s;
-        resolver_timeout 5s;
         proxy_pass $http_target;
         proxy_protocol off;
         proxy_timeout 1s;
