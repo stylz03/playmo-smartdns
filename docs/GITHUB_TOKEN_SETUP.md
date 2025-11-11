@@ -29,7 +29,7 @@
 3. Click "New repository secret"
 
 4. Configure:
-   - **Name**: `GITHUB_TOKEN`
+   - **Name**: `GH_TOKEN` ⚠️ **Important**: Cannot use `GITHUB_TOKEN` - GitHub reserves that prefix!
    - **Secret**: Paste your token (the `ghp_...` value)
 
 5. Click "Add secret"
