@@ -6,7 +6,7 @@ set -e
 
 echo "=========================================="
 echo "Fixing Sniproxy Systemd Service"
-echo "==========================================
+echo "=========================================="
 
 # Stop sniproxy
 systemctl stop sniproxy 2>/dev/null || true
