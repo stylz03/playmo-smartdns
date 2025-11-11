@@ -266,6 +266,52 @@ jobs:
         env:
           TF_VAR_firebase_credentials: ${{ secrets.FIREBASE_CREDENTIALS }}
           TF_VAR_lambda_whitelist_url: ${{ secrets.LAMBDA_WHITELIST_URL }}
+          TF_VAR_use_existing_eip: ${{ steps.check_eip.outputs.use_existing }}
+          TF_VAR_existing_eip_address: ${{ steps.check_eip.outputs.existing_eip }}
+
+      - name: Clean up unused EIPs after deployment
+        run: |
+          echo "Checking for unused Elastic IPs after deployment..."
+          # Get current instance's EIP
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --region us-east-2 \
+            --filters "Name=tag:Name,Values=playmo-smartdns-dns-only-ec2" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
+            CURRENT_EIP=$(aws ec2 describe-addresses \
+              --region us-east-2 \
+              --filters "Name=instance-id,Values=$INSTANCE_ID" \
+              --query 'Addresses[0].PublicIp' \
+              --output text 2>/dev/null || echo "")
+            
+            echo "Current instance EIP: $CURRENT_EIP"
+            
+            # Get all unassociated EIPs (excluding the current one)
+            UNUSED_EIPS=$(aws ec2 describe-addresses \
+              --region us-east-2 \
+              --filters "Name=domain,Values=vpc" \
+              --query "Addresses[?AssociationId==\`null\` && PublicIp!=\`$CURRENT_EIP\`].[AllocationId,PublicIp]" \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -n "$UNUSED_EIPS" ]; then
+              echo "$UNUSED_EIPS" | while read ALLOC_ID EIP_IP; do
+                if [ -n "$ALLOC_ID" ] && [ "$ALLOC_ID" != "None" ] && [ -n "$EIP_IP" ]; then
+                  echo "Releasing unused EIP: $EIP_IP (Allocation: $ALLOC_ID)"
+                  aws ec2 release-address \
+                    --region us-east-2 \
+                    --allocation-id "$ALLOC_ID" 2>&1 && echo "✅ Released $EIP_IP" || echo "⚠️ Failed to release $EIP_IP"
+                fi
+              done
+            else
+              echo "No unused Elastic IPs found"
+            fi
+          else
+            echo "Could not find instance, skipping EIP cleanup"
+          fi
+        working-directory: terraform
+        continue-on-error: true
 
       - name: Capture Terraform Outputs
         id: tf_outputs
