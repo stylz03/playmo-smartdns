@@ -52,7 +52,7 @@ EOF
 while IFS= read -r domain; do
     if [ -n "$domain" ]; then
         domain_escaped=$(echo "$domain" | sed 's/\./\\./g')
-        echo "        ~^(.*|)${domain_escaped}\$    \$ssl_preread_server_name:443;" >> /etc/nginx/stream.conf
+        echo "        ~^(.*|)${domain_escaped}\$    \${ssl_preread_server_name}:443;" >> /etc/nginx/stream.conf
     fi
 done <<< "$DOMAINS"
 
@@ -68,7 +68,7 @@ EOF
 while IFS= read -r domain; do
     if [ -n "$domain" ]; then
         domain_escaped=$(echo "$domain" | sed 's/\./\\./g')
-        echo "        ~^(.*|)${domain_escaped}\$    \$ssl_preread_server_name:80;" >> /etc/nginx/stream.conf
+        echo "        ~^(.*|)${domain_escaped}\$    \${ssl_preread_server_name}:80;" >> /etc/nginx/stream.conf
     fi
 done <<< "$DOMAINS"
 
