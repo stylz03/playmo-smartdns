@@ -181,11 +181,25 @@ jobs:
                 
                 if [ -n "$EIP_ALLOCATION" ] && [ "$EIP_ALLOCATION" != "None" ] && [ "$EIP_ALLOCATION" != "" ]; then
                   echo "Found Elastic IP: $EIP_ALLOCATION"
-                  if terraform state show 'aws_eip.smartdns' >/dev/null 2>&1; then
-                    echo "Elastic IP already in Terraform state"
+                  # Get the public IP to check if it's the existing EIP
+                  EIP_PUBLIC_IP=$(aws ec2 describe-addresses \
+                    --region us-east-2 \
+                    --allocation-ids "$EIP_ALLOCATION" \
+                    --query 'Addresses[0].PublicIp' \
+                    --output text 2>/dev/null || echo "")
+                  
+                  # If it's the existing EIP (3.151.46.11), it's a data source, not a resource - skip import
+                  if [ "$EIP_PUBLIC_IP" = "3.151.46.11" ]; then
+                    echo "Elastic IP $EIP_PUBLIC_IP is the existing EIP - using data source, no import needed"
                   else
-                    echo "Importing Elastic IP..."
-                    terraform import 'aws_eip.smartdns' $EIP_ALLOCATION 2>&1 || echo "Elastic IP import failed"
+                    # Check if already in state (try both with and without index)
+                    if terraform state show 'aws_eip.smartdns[0]' >/dev/null 2>&1 || terraform state show 'aws_eip.smartdns' >/dev/null 2>&1; then
+                      echo "Elastic IP already in Terraform state"
+                    else
+                      echo "Importing Elastic IP as resource (with [0] index)..."
+                      # aws_eip.smartdns uses count, so import with [0] index
+                      terraform import 'aws_eip.smartdns[0]' "$EIP_ALLOCATION" 2>&1 || echo "⚠️ Elastic IP import failed (may be using existing EIP data source)"
+                    fi
                   fi
                 fi
               else
