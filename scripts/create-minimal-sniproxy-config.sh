@@ -51,16 +51,17 @@ echo "✅ Created minimal config with 3 domains"
 
 # Test if it works
 echo "Testing configuration..."
-if sudo /usr/local/sbin/sniproxy -c /etc/sniproxy/sniproxy.conf -f &
-    TEST_PID=$!
-    sleep 2
-    if kill -0 $TEST_PID 2>/dev/null; then
-        kill $TEST_PID 2>/dev/null || true
-        echo "✅ Minimal config works! The issue is with the full config."
-        echo "Now let's create the full config properly..."
-        
-        # Create full config
-        sudo tee /etc/sniproxy/sniproxy.conf > /dev/null <<'FULLCONF'
+sudo /usr/local/sbin/sniproxy -c /etc/sniproxy/sniproxy.conf -f &
+TEST_PID=$!
+sleep 2
+
+if kill -0 $TEST_PID 2>/dev/null; then
+    kill $TEST_PID 2>/dev/null || true
+    echo "✅ Minimal config works! The issue is with the full config."
+    echo "Now let's create the full config properly..."
+    
+    # Create full config
+    sudo tee /etc/sniproxy/sniproxy.conf > /dev/null <<'FULLCONF'
 user daemon
 pidfile /var/run/sniproxy.pid
 
@@ -190,14 +191,12 @@ listen 0.0.0.0:80 {
 }
 FULLCONF
         
-        echo "✅ Full config created"
-    else
-        echo "❌ Even minimal config failed. Checking error:"
-        wait $TEST_PID 2>/dev/null || true
-        exit 1
-    fi
+    echo "✅ Full config created"
 else
-    echo "❌ Failed to test config"
+    echo "❌ Even minimal config failed. Checking error:"
+    wait $TEST_PID 2>/dev/null || true
+    echo "Error details:"
+    sudo journalctl -xeu sniproxy.service --no-pager | tail -10
     exit 1
 fi
 
