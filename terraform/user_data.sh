@@ -23,7 +23,7 @@ curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/script
 if [ -f /tmp/create-zones.sh ]; then
     chmod +x /tmp/create-zones.sh
     # Run zone file creation with EC2 IP (from Terraform variable)
-    EC2_IP_VAL="${EC2_PUBLIC_IP:-3.151.46.11}"
+    EC2_IP_VAL="$${EC2_PUBLIC_IP:-3.151.46.11}"
     bash /tmp/create-zones.sh "$$EC2_IP_VAL" || echo "Warning: Zone setup script failed"
 fi
 
@@ -67,7 +67,7 @@ curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/script
 if [ -f /usr/local/bin/sync-sniproxy-config.sh ]; then
     chmod +x /usr/local/bin/sync-sniproxy-config.sh
     # Initial sync from services.json
-    EC2_IP_VAL="${EC2_PUBLIC_IP:-3.151.46.11}"
+    EC2_IP_VAL="$${EC2_PUBLIC_IP:-3.151.46.11}"
     curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json -o /tmp/services.json
     if [ -f /tmp/services.json ]; then
         EC2_IP="$$EC2_IP_VAL" /usr/local/bin/sync-sniproxy-config.sh /tmp/services.json /etc/sniproxy/sniproxy.conf || echo "Warning: Initial sync failed"
