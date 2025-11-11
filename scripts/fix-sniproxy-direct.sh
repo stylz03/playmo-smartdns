@@ -167,11 +167,12 @@ sudo chown root:root /etc/sniproxy/sniproxy.conf
 # Verify
 echo ""
 echo "Verifying config..."
-# Check for actual corruption: "roto" as a standalone word (not part of "proto")
-if grep -qE "^[[:space:]]*roto[[:space:]]" /etc/sniproxy/sniproxy.conf || grep -qE "[[:space:]]roto[[:space:]]" /etc/sniproxy/sniproxy.conf; then
+# Check for actual corruption: "roto" that is NOT part of "proto"
+# This checks for "roto" that is not preceded by "p"
+if grep -qE "[^p]roto[[:space:]]" /etc/sniproxy/sniproxy.conf || grep -qE "^roto[[:space:]]" /etc/sniproxy/sniproxy.conf; then
     echo "❌ ERROR: Found corrupted 'roto' (not 'proto') in config!"
     echo "File content around corrupted 'roto':"
-    grep -nE "^[[:space:]]*roto[[:space:]]|[[:space:]]roto[[:space:]]" /etc/sniproxy/sniproxy.conf || true
+    grep -nE "[^p]roto[[:space:]]|^roto[[:space:]]" /etc/sniproxy/sniproxy.conf || true
     exit 1
 fi
 
