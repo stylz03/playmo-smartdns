@@ -221,11 +221,10 @@ resource "aws_instance" "smartdns" {
   }
 }
 
-# Associate Elastic IP with EC2 instance
-# Use data source to get instance ID if resource wasn't created (count=0)
+# Get instance ID from data source if resource wasn't created
 data "aws_instance" "existing" {
-  count       = length(data.aws_instances.existing.ids) > 0 && length(aws_instance.smartdns) == 0 ? 1 : 0
-  instance_id = length(data.aws_instances.existing.ids) > 0 ? data.aws_instances.existing.ids[0] : null
+  count       = length(data.aws_instances.existing.ids) > 0 ? 1 : 0
+  instance_id = data.aws_instances.existing.ids[0]
 }
 
 locals {
@@ -235,7 +234,7 @@ locals {
 
 # Associate Elastic IP with EC2 instance
 resource "aws_eip_association" "smartdns" {
-  # Always create if we have both instance and EIP
+  # Only create if we have both instance ID and EIP allocation ID
   instance_id   = local.instance_id_to_use
   allocation_id = local.eip_allocation_id
   
