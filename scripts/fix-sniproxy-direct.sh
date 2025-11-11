@@ -167,12 +167,13 @@ sudo chown root:root /etc/sniproxy/sniproxy.conf
 # Verify
 echo ""
 echo "Verifying config..."
-# Check for actual corruption: "roto" that is NOT part of "proto"
-# This checks for "roto" that is not preceded by "p"
-if grep -qE "[^p]roto[[:space:]]" /etc/sniproxy/sniproxy.conf || grep -qE "^roto[[:space:]]" /etc/sniproxy/sniproxy.conf; then
+# Check for actual corruption: lines containing "roto" but NOT "proto"
+# This is the correct way - find lines with "roto" that don't have "proto"
+CORRUPTED=$(grep -n "roto" /etc/sniproxy/sniproxy.conf | grep -v "proto" || true)
+if [ -n "$CORRUPTED" ]; then
     echo "❌ ERROR: Found corrupted 'roto' (not 'proto') in config!"
-    echo "File content around corrupted 'roto':"
-    grep -nE "[^p]roto[[:space:]]|^roto[[:space:]]" /etc/sniproxy/sniproxy.conf || true
+    echo "Corrupted lines:"
+    echo "$CORRUPTED"
     exit 1
 fi
 
