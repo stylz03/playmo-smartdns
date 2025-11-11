@@ -205,9 +205,22 @@ jobs:
               else
                 echo "⚠️ EC2 instance import failed, but continuing..."
               fi
+            else
+              echo "No existing EC2 instance found, will create new one"
             fi
-          else
-            echo "No existing EC2 instance found, will create new one"
+          fi
+          
+          # Check for duplicate instances and warn
+          ALL_INSTANCES=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$INSTANCE_NAME" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[*].Instances[*].InstanceId' \
+            --output text --region us-east-2 2>/dev/null | tr '\t' '\n' | grep -v '^$' || echo "")
+          
+          INSTANCE_COUNT=$(echo "$ALL_INSTANCES" | wc -l)
+          if [ "$INSTANCE_COUNT" -gt 1 ]; then
+            echo "⚠️ WARNING: Found $INSTANCE_COUNT running instances with name $INSTANCE_NAME"
+            echo "Instances: $ALL_INSTANCES"
+            echo "Terraform will manage only one instance. Consider terminating duplicates manually."
           fi
         working-directory: terraform
         continue-on-error: true

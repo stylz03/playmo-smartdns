@@ -192,11 +192,11 @@ resource "aws_instance" "smartdns" {
 
   lifecycle {
     # Prevent unnecessary recreation - only recreate if AMI or instance type changes
-    create_before_destroy = true
+    create_before_destroy = false  # Changed to false to prevent duplicate instances
     ignore_changes = [
       # Ignore changes to user_data after initial creation (to allow manual updates)
-      # Uncomment if you want to prevent user_data changes from triggering recreation:
-      # user_data,
+      # This prevents user_data changes from triggering instance recreation
+      user_data,
     ]
   }
 
