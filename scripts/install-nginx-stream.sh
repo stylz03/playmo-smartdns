@@ -14,6 +14,18 @@ echo "Installing dependencies..."
 apt-get update
 apt-get install -y nginx build-essential libpcre3 libpcre3-dev zlib1g zlib1g-dev libssl-dev libgd-dev libxml2 libxml2-dev uuid-dev
 
+# Stop and remove system Nginx if installed
+if systemctl is-active --quiet nginx 2>/dev/null; then
+    echo "Stopping system Nginx..."
+    systemctl stop nginx
+fi
+
+# Remove conflicting module configs
+if [ -d /etc/nginx/modules-enabled ]; then
+    echo "Removing conflicting module configs..."
+    rm -f /etc/nginx/modules-enabled/*.conf 2>/dev/null || true
+fi
+
 # Download and compile Nginx with stream_ssl_preread_module
 echo "Downloading Nginx source..."
 cd /tmp
@@ -31,7 +43,7 @@ cd nginx-${NGINX_VERSION}/
 
 echo "Configuring Nginx with stream_ssl_preread_module..."
 ./configure \
-    --prefix=/var/www/html \
+    --prefix=/usr/share/nginx \
     --sbin-path=/usr/sbin/nginx \
     --conf-path=/etc/nginx/nginx.conf \
     --http-log-path=/var/log/nginx/access.log \
@@ -57,6 +69,9 @@ make install
 
 # Hold nginx packages to prevent auto-updates
 apt-mark hold nginx* libnginx* 2>/dev/null || true
+
+# Ensure modules directory exists
+mkdir -p /etc/nginx/modules
 
 echo "✅ Nginx installed with stream_ssl_preread_module"
 
