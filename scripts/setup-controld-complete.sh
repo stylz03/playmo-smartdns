@@ -1,33 +1,25 @@
 #!/bin/bash
-# Setup ControlD endpoint routing (Tailscale-style integration)
-# Routes outbound traffic through ControlD endpoints
-# Usage: ./setup-controld-endpoint-routing.sh <resolver-id> [dns-primary] [dns-secondary]
+# Complete ControlD setup with your specific credentials
+# Resolver ID: 12lwu5ien99
+# DNS: 76.76.2.155, 76.76.10.155
 
 set -e
 
-CONTROLD_RESOLVER_ID="${1:-12lwu5ien99}"
-CONTROLD_DNS_PRIMARY="${2:-76.76.2.155}"
-CONTROLD_DNS_SECONDARY="${3:-76.76.10.155}"
-
-if [ -z "$CONTROLD_RESOLVER_ID" ]; then
-    echo "Usage: $0 <resolver-id> [dns-primary] [dns-secondary]"
-    echo ""
-    echo "Example: $0 abc123def456 76.76.19.19 76.76.21.21"
-    echo ""
-    echo "Get your Resolver ID from ControlD dashboard:"
-    echo "  - Log into ControlD"
-    echo "  - Go to 'Resolvers' or 'Endpoints'"
-    echo "  - Copy your Resolver ID"
-    exit 1
-fi
+CONTROLD_RESOLVER_ID="12lwu5ien99"
+CONTROLD_DNS_PRIMARY="76.76.2.155"
+CONTROLD_DNS_SECONDARY="76.76.10.155"
+CONTROLD_DOH_ENDPOINT="https://dns.controld.com/12lwu5ien99"
+CONTROLD_DOT_ENDPOINT="12lwu5ien99.dns.controld.com"
 
 echo "=========================================="
-echo "Setting up ControlD Endpoint Routing"
+echo "ControlD Endpoint Routing Setup"
 echo "=========================================="
 echo ""
 echo "Resolver ID: $CONTROLD_RESOLVER_ID"
 echo "DNS Primary: $CONTROLD_DNS_PRIMARY"
 echo "DNS Secondary: $CONTROLD_DNS_SECONDARY"
+echo "DoH Endpoint: $CONTROLD_DOH_ENDPOINT"
+echo "DoT Endpoint: $CONTROLD_DOT_ENDPOINT"
 echo ""
 
 # 1. Configure BIND9 to forward to ControlD DNS
@@ -60,36 +52,17 @@ else
     echo "  ⚠️  Could not resolve Disney+"
 fi
 
-# 3. Save ControlD configuration
-echo ""
-echo "Step 3: Saving ControlD configuration..."
-mkdir -p /etc/controld
-cat > /etc/controld/config.txt <<EOF
-CONTROLD_RESOLVER_ID=$CONTROLD_RESOLVER_ID
-CONTROLD_DNS_PRIMARY=$CONTROLD_DNS_PRIMARY
-CONTROLD_DNS_SECONDARY=$CONTROLD_DNS_SECONDARY
-CONTROLD_DOH_ENDPOINT=https://dns.controld.com/$CONTROLD_RESOLVER_ID
-CONFIGURED_DATE=$(date)
-EOF
-
-echo "✅ Configuration saved to /etc/controld/config.txt"
-
-# 4. Update system resolv.conf (optional - for system DNS)
-echo ""
-echo "Step 4: Configuring system DNS (optional)..."
-if [ -f /etc/resolv.conf ]; then
-    # Backup
-    cp /etc/resolv.conf /etc/resolv.conf.backup.$(date +%Y%m%d_%H%M%S)
-    echo "# ControlD DNS configuration" > /tmp/resolv.conf.controld
-    echo "nameserver $CONTROLD_DNS_PRIMARY" >> /tmp/resolv.conf.controld
-    echo "nameserver $CONTROLD_DNS_SECONDARY" >> /tmp/resolv.conf.controld
-    echo "✅ System DNS configuration created (backup in /etc/resolv.conf.backup.*)"
-    echo "   Note: /etc/resolv.conf may be managed by systemd-resolved"
+echo "Testing Hulu:"
+HULU_IP=$(dig @$CONTROLD_DNS_PRIMARY +short hulu.com A | head -1)
+if [ -n "$HULU_IP" ]; then
+    echo "  ✅ Hulu resolves to: $HULU_IP"
+else
+    echo "  ⚠️  Could not resolve Hulu"
 fi
 
-# 5. Test BIND9 forwarding
+# 3. Test BIND9 forwarding
 echo ""
-echo "Step 5: Testing BIND9 forwarding to ControlD..."
+echo "Step 3: Testing BIND9 forwarding to ControlD..."
 LOCAL_NETFLIX=$(dig @127.0.0.1 +short netflix.com A | head -1)
 if [ -n "$LOCAL_NETFLIX" ]; then
     echo "  ✅ BIND9 forwarding working: Netflix -> $LOCAL_NETFLIX"
@@ -97,25 +70,45 @@ else
     echo "  ⚠️  BIND9 forwarding test failed"
 fi
 
+# 4. Save ControlD configuration
+echo ""
+echo "Step 4: Saving ControlD configuration..."
+mkdir -p /etc/controld
+cat > /etc/controld/config.txt <<EOF
+CONTROLD_RESOLVER_ID=$CONTROLD_RESOLVER_ID
+CONTROLD_DNS_PRIMARY=$CONTROLD_DNS_PRIMARY
+CONTROLD_DNS_SECONDARY=$CONTROLD_DNS_SECONDARY
+CONTROLD_DOH_ENDPOINT=$CONTROLD_DOH_ENDPOINT
+CONTROLD_DOT_ENDPOINT=$CONTROLD_DOT_ENDPOINT
+CONFIGURED_DATE=$(date)
+EOF
+
+echo "✅ Configuration saved to /etc/controld/config.txt"
+
+# 5. Display configuration summary
 echo ""
 echo "=========================================="
-echo "✅ ControlD Endpoint Routing Setup Complete"
+echo "✅ ControlD Setup Complete!"
 echo "=========================================="
 echo ""
-echo "Configuration:"
+echo "Configuration Summary:"
 echo "  Resolver ID: $CONTROLD_RESOLVER_ID"
 echo "  DNS Primary: $CONTROLD_DNS_PRIMARY"
 echo "  DNS Secondary: $CONTROLD_DNS_SECONDARY"
-echo "  DoH Endpoint: https://dns.controld.com/$CONTROLD_RESOLVER_ID"
+echo "  DoH Endpoint: $CONTROLD_DOH_ENDPOINT"
+echo "  DoT Endpoint: $CONTROLD_DOT_ENDPOINT"
+echo ""
+echo "EC2 Public IP: $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo '3.151.46.11')"
 echo ""
 echo "Next Steps:"
 echo "1. Test DNS from client:"
-echo "   nslookup netflix.com 3.151.46.11"
+echo "   nslookup netflix.com $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo '3.151.46.11')"
 echo ""
-echo "2. Set client DNS to EC2 IP: 3.151.46.11"
+echo "2. Set client DNS to EC2 IP: $(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo '3.151.46.11')"
 echo ""
 echo "3. Test streaming services in browser"
 echo ""
 echo "4. ControlD handles all geo-unblocking automatically!"
+echo "   No need to maintain IP ranges anymore!"
 echo ""
 
