@@ -68,12 +68,15 @@ cat > "$CONFIG_FILE" <<EOF
 # 3. Enable "Always-on VPN" or "Auto-connect"
 # 4. Connect
 #
-# DNS: 3.151.46.11 (SmartDNS via ControlD)
+# IMPORTANT: DNS is set to SmartDNS (3.151.46.11)
+# SmartDNS forwards to ControlD for geo-unblocking
+# So even though traffic goes through WireGuard VPN,
+# DNS queries use SmartDNS → ControlD → Geo-unblocked IPs
 
 [Interface]
 PrivateKey = $CLIENT_PRIVATE_KEY
 Address = $CLIENT_IP/24
-DNS = 3.151.46.11  # SmartDNS
+DNS = 3.151.46.11  # SmartDNS (EC2) → ControlD → Geo-unblocked IPs
 
 [Peer]
 PublicKey = $SERVER_PUBLIC_KEY
