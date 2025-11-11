@@ -64,3 +64,10 @@ variable "existing_eip_address" {
   default     = "3.151.46.11"
   description = "Existing Elastic IP address to use if use_existing_eip is true."
 }
+
+variable "github_token" {
+  type        = string
+  default     = null
+  sensitive   = true
+  description = "GitHub Personal Access Token for downloading files from private repository. Should be provided via GitHub Secrets."
+}

@@ -274,6 +274,7 @@ jobs:
           TF_VAR_lambda_whitelist_url: ${{ secrets.LAMBDA_WHITELIST_URL }}
           TF_VAR_use_existing_eip: ${{ steps.check_eip.outputs.use_existing }}
           TF_VAR_existing_eip_address: ${{ steps.check_eip.outputs.existing_eip }}
+          TF_VAR_github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
@@ -283,6 +284,7 @@ jobs:
           TF_VAR_lambda_whitelist_url: ${{ secrets.LAMBDA_WHITELIST_URL }}
           TF_VAR_use_existing_eip: ${{ steps.check_eip.outputs.use_existing }}
           TF_VAR_existing_eip_address: ${{ steps.check_eip.outputs.existing_eip }}
+          TF_VAR_github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Sync sniproxy config if services.json changed
         if: contains(github.event.head_commit.modified, 'services.json') || contains(github.event.head_commit.added, 'services.json') || github.event_name == 'workflow_dispatch'

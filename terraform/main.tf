@@ -184,6 +184,7 @@ resource "aws_instance" "smartdns" {
     LAMBDA_WHITELIST_URL = local.lambda_url
     SECURITY_GROUP_ID    = aws_security_group.smartdns_sg.id
     EC2_PUBLIC_IP        = local.eip_public_ip
+    GITHUB_TOKEN         = var.github_token != null ? var.github_token : ""
   })
   
   # Lambda URL will be set after Lambda is created
