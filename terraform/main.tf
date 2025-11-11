@@ -178,7 +178,6 @@ resource "aws_instance" "smartdns" {
   user_data = templatefile("${path.module}/user_data.sh", {
     NAMED_CONF_LOCAL     = local.named_conf_local
     NAMED_CONF_OPTIONS   = local.named_conf_options
-    ZONE_FILES           = jsonencode(local.zone_files)
     FIREBASE_CREDENTIALS = var.firebase_credentials != null ? var.firebase_credentials : ""
     LAMBDA_WHITELIST_URL = local.lambda_url
     SECURITY_GROUP_ID    = aws_security_group.smartdns_sg.id

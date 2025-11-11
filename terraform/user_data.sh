@@ -13,33 +13,17 @@ EOF
 # Create zones directory for static A records
 mkdir -p /etc/bind/zones
 
-# Create zone files for domains with static US CDN IPs
-if [ -n "$${ZONE_FILES}" ] && [ "$${ZONE_FILES}" != "null" ]; then
-    echo "Creating zone files for static US CDN IPs..."
-    # Write JSON to temp file, then parse it
-    echo '${ZONE_FILES}' > /tmp/zone_files.json
-    python3 <<'PYTHON_SCRIPT'
-import json
-import os
-import sys
+# Zone files will be created by a separate script downloaded from GitHub
+# This keeps user_data under 16KB limit
+echo "Zone files will be created by setup script..."
 
-try:
-    with open('/tmp/zone_files.json', 'r') as f:
-        zone_files = json.load(f)
-    
-    for domain, zone_content in zone_files.items():
-        if zone_content:
-            zone_file = f"/etc/bind/zones/db.{domain.replace('.', '_')}"
-            with open(zone_file, 'w') as f:
-                f.write(zone_content)
-            os.chmod(zone_file, 0o644)
-            print(f"Created zone file: {zone_file} for {domain}")
-    
-    os.remove('/tmp/zone_files.json')
-except Exception as e:
-    print(f"Error creating zone files: {e}", file=sys.stderr)
-    sys.exit(1)
-PYTHON_SCRIPT
+# Download and run zone file setup script
+echo "Downloading zone file setup script..."
+curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/setup-all-static-ips.sh -o /tmp/setup-zones.sh || echo "Warning: Could not download zone setup script"
+if [ -f /tmp/setup-zones.sh ]; then
+    chmod +x /tmp/setup-zones.sh
+    # Run only the zone file creation part (not the named.conf.local update)
+    bash /tmp/setup-zones.sh --zones-only || echo "Warning: Zone setup script failed, will use forwarding only"
 fi
 
 # Inject selective forward zones and static zones

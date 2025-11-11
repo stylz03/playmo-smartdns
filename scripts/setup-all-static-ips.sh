@@ -1,8 +1,14 @@
 #!/bin/bash
 # Script to apply static US CDN IPs for all streaming services
 # Run this on the EC2 instance via SSH: sudo bash setup-all-static-ips.sh
+# Or use --zones-only flag to only create zone files without updating named.conf.local
 
 set -e
+
+ZONES_ONLY=false
+if [ "$1" == "--zones-only" ]; then
+    ZONES_ONLY=true
+fi
 
 echo "=========================================="
 echo "Setting up static US CDN IPs for all streaming services"
@@ -92,6 +98,14 @@ for domain in "sling.com" "discoveryplus.com" "tubi.tv" "crackle.com" "roku.com"
               "dishanywhere.com" "xumo.tv" "hgtv.com" "amcplus.com" "mgmplus.com"; do
     create_zone_file "$domain" "23.185.0.1" "23.185.0.2"
 done
+
+# Update named.conf.local (skip if zones-only mode)
+if [ "$ZONES_ONLY" == "true" ]; then
+    echo ""
+    echo "Zones-only mode: Skipping named.conf.local update"
+    echo "Zone files created. named.conf.local should be updated separately."
+    exit 0
+fi
 
 # Update named.conf.local
 echo ""
