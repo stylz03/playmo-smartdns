@@ -68,7 +68,6 @@ if [ -f /usr/local/bin/sync-nginx-stream-config.sh ]; then
     chmod +x /usr/local/bin/sync-nginx-stream-config.sh
     # Initial sync from services.json
     curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json -o /tmp/services.json || echo "Warning: Could not download services.json"
-fi
     if [ -f /tmp/services.json ]; then
         /usr/local/bin/sync-nginx-stream-config.sh /tmp/services.json /etc/nginx/conf.d/stream.conf || echo "Warning: Initial Nginx config sync failed"
     fi
