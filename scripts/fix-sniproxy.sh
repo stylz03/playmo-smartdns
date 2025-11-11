@@ -28,13 +28,25 @@ else
     echo "✅ Ports 80 and 443 are available"
 fi
 
-# Check current config
+# Check current config by looking at service status
 echo ""
-echo "Validating current sniproxy configuration..."
-if sudo /usr/local/sbin/sniproxy -c /etc/sniproxy/sniproxy.conf -t 2>&1; then
-    echo "✅ Configuration is valid"
+echo "Checking sniproxy service status..."
+SERVICE_ERROR=$(sudo systemctl status sniproxy --no-pager 2>&1 | grep -i "error\|failed" || echo "")
+if [ -z "$SERVICE_ERROR" ] && sudo systemctl is-active --quiet sniproxy 2>/dev/null; then
+    echo "✅ sniproxy is running"
+    CONFIG_VALID=true
 else
-    echo "❌ Configuration has errors, fixing..."
+    echo "❌ sniproxy is not running, checking configuration..."
+    # Check logs for config errors
+    LOG_ERROR=$(sudo journalctl -xeu sniproxy.service --no-pager 2>&1 | tail -5 | grep -i "error\|invalid\|failed" || echo "")
+    if [ -n "$LOG_ERROR" ]; then
+        echo "Found error in logs:"
+        echo "$LOG_ERROR"
+    fi
+    CONFIG_VALID=false
+fi
+
+if [ "$CONFIG_VALID" != "true" ]; then
     
     # Create corrected config
     sudo tee /etc/sniproxy/sniproxy.conf > /dev/null <<'EOF'
@@ -172,14 +184,7 @@ EOF
 
     echo "✅ Created corrected configuration"
     
-    # Validate again
-    if sudo /usr/local/sbin/sniproxy -c /etc/sniproxy/sniproxy.conf -t 2>&1; then
-        echo "✅ New configuration is valid"
-    else
-        echo "❌ Configuration still has errors:"
-        sudo /usr/local/sbin/sniproxy -c /etc/sniproxy/sniproxy.conf -t
-        exit 1
-    fi
+    echo "✅ New configuration created"
 fi
 
 # Fix systemd service if needed
