@@ -32,6 +32,10 @@ cat > "$NGINX_STREAM_CONF_TMP" <<'EOF'
 # Do not edit manually - changes will be overwritten
 
 stream {
+    # Resolver for DNS lookups (required for proxy_pass with variables)
+    resolver 8.8.8.8 8.8.4.4 1.1.1.1 valid=300s;
+    resolver_timeout 5s;
+
     # Map SNI server name to target
     map $ssl_preread_server_name $ssl_target {
         default $ssl_preread_server_name:443;
@@ -43,7 +47,7 @@ while IFS= read -r domain; do
         # Escape dots for regex
         domain_escaped=$(echo "$domain" | sed 's/\./\\./g')
         # Add regex pattern to match domain and all subdomains
-        echo "        ~^(.*|)${domain_escaped}\$    \$ssl_preread_server_name:443;" >> "$NGINX_STREAM_CONF_TMP"
+        echo "        ~^\(.*|\)${domain_escaped}\$    \${ssl_preread_server_name}:443;" >> "$NGINX_STREAM_CONF_TMP"
     fi
 done <<< "$DOMAINS"
 
@@ -59,7 +63,7 @@ EOF
 while IFS= read -r domain; do
     if [ -n "$domain" ]; then
         domain_escaped=$(echo "$domain" | sed 's/\./\\./g')
-        echo "        ~^(.*|)${domain_escaped}\$    \$ssl_preread_server_name:80;" >> "$NGINX_STREAM_CONF_TMP"
+        echo "        ~^\(.*|\)${domain_escaped}\$    \${ssl_preread_server_name}:80;" >> "$NGINX_STREAM_CONF_TMP"
     fi
 done <<< "$DOMAINS"
 
