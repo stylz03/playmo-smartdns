@@ -101,17 +101,20 @@ cat >> "$SNIPROXY_CONF_TMP" <<EOF
 }
 EOF
 
-# Validate configuration
-if command -v sniproxy >/dev/null 2>&1; then
-    if sniproxy -c "$SNIPROXY_CONF_TMP" -t >/dev/null 2>&1; then
-        echo "✅ sniproxy configuration is valid"
-    else
-        echo "❌ sniproxy configuration validation failed"
-        sniproxy -c "$SNIPROXY_CONF_TMP" -t
-        rm -f "$SNIPROXY_CONF_TMP"
-        exit 1
-    fi
+# Validate configuration (sniproxy doesn't have -t flag, so we'll just check if file exists and is readable)
+if [ ! -f "$SNIPROXY_CONF_TMP" ]; then
+    echo "❌ Configuration file was not created"
+    exit 1
 fi
+
+# Check basic syntax (file is readable and has required sections)
+if ! grep -q "listen.*443" "$SNIPROXY_CONF_TMP" || ! grep -q "table" "$SNIPROXY_CONF_TMP"; then
+    echo "❌ Configuration appears to be missing required sections"
+    rm -f "$SNIPROXY_CONF_TMP"
+    exit 1
+fi
+
+echo "✅ Configuration file created and appears valid"
 
 # Replace config file
 if [ -f "$SNIPROXY_CONF" ]; then
