@@ -83,21 +83,24 @@ if [ -f /usr/local/bin/sync-nginx-stream-config.sh ]; then
     fi
 fi
 
-# Ensure Nginx main config loads stream module
+# Ensure Nginx main config loads stream module and includes stream config
 if [ -f /etc/nginx/nginx.conf ]; then
     # Backup original config
     cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
     
-    # Add stream module load if not present
+    # Add stream module load at the top if not present
     if ! grep -q "load_module.*ngx_stream_module" /etc/nginx/nginx.conf; then
-        # Add at the top after any comments
-        sed -i '1a load_module /etc/nginx/modules/ngx_stream_module.so;' /etc/nginx/nginx.conf
+        # Find the first non-comment line and add before it
+        sed -i '0,/^[^#]/s//load_module \/etc\/nginx\/modules\/ngx_stream_module.so;\n&/' /etc/nginx/nginx.conf || \
+        sed -i '1i load_module /etc/nginx/modules/ngx_stream_module.so;' /etc/nginx/nginx.conf
     fi
     
-    # Add stream block include if not present
-    if ! grep -q "include.*stream" /etc/nginx/nginx.conf; then
-        # Add at the end before the closing brace
-        sed -i '$a include /etc/nginx/conf.d/stream.conf;' /etc/nginx/nginx.conf
+    # The stream block should be at the root level, not inside http block
+    # Check if stream block already exists
+    if ! grep -q "^stream {" /etc/nginx/nginx.conf && ! grep -q "^include.*stream.conf" /etc/nginx/nginx.conf; then
+        # Add include for stream config at the end of the file (outside http block)
+        echo "" >> /etc/nginx/nginx.conf
+        echo "include /etc/nginx/conf.d/stream.conf;" >> /etc/nginx/nginx.conf
     fi
 fi
 
