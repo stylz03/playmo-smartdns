@@ -46,8 +46,16 @@ options {
     # Ensure queries use the EC2's public IP (US-based)
     # This makes upstream DNS resolvers see queries from US location
     query-source address *;
-    # No global forwarders - streaming domains use zone-specific forwarding
-    # Non-streaming domains use normal recursive resolution
+    # Forwarders for non-streaming domains (domains not in zone files)
+    # Streaming domains are resolved from zone files to EC2 IP
+    # All other domains are forwarded to Google and Cloudflare DNS
+    forwarders {
+        8.8.8.8;        // Google DNS
+        8.8.4.4;        // Google DNS secondary
+        1.1.1.1;        // Cloudflare DNS
+        1.0.0.1;        // Cloudflare DNS secondary
+    };
+    forward only;      // Only use forwarders, don't do full recursive resolution
 };
 EOF
 }
