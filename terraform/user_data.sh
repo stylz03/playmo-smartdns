@@ -91,19 +91,21 @@ fi
 setcap 'cap_net_bind_service=+ep' /usr/local/sbin/sniproxy 2>/dev/null || echo "Warning: Could not set capabilities, will run as root"
 
 # Create systemd service for sniproxy
-# Try running as sniproxy user first (with capabilities), fallback to root if needed
+# Use Type=simple with -f flag (foreground mode) - this is the working configuration
 cat > /etc/systemd/system/sniproxy.service <<'SNIPROXY_SERVICE'
 [Unit]
 Description=SNI Proxy for SmartDNS
 After=network.target
 
 [Service]
-Type=forking
+Type=simple
 User=root
-ExecStart=/usr/local/sbin/sniproxy -c /etc/sniproxy/sniproxy.conf
+ExecStart=/usr/local/sbin/sniproxy -c /etc/sniproxy/sniproxy.conf -f
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
