@@ -156,22 +156,34 @@ jobs:
             echo "No existing Lambda function found, will create new one"
           fi
           
-          # Import EC2 Instance if it exists (get the most recent running instance with the correct name)
+          # Import EC2 Instance if it exists (CRITICAL: Must import before plan to prevent creation)
           INSTANCE_NAME="playmo-smartdns-dns-only-ec2"
+          
+          # Check ALL instance states (not just running) to catch any existing instance
           INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=$INSTANCE_NAME" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[*].Instances[*].[InstanceId,LaunchTime]' \
+            --filters "Name=tag:Name,Values=$INSTANCE_NAME" \
+            --query 'Reservations[*].Instances[*].[InstanceId,State.Name,LaunchTime]' \
             --output text --region us-east-2 2>/dev/null | \
-            sort -k2 -r | head -n1 | awk '{print $1}' || echo "")
+            sort -k3 -r | head -n1 | awk '{print $1}' || echo "")
           
           if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ] && [ "$INSTANCE_ID" != "" ]; then
-            echo "Found existing EC2 instance: $INSTANCE_ID"
-            if terraform state show 'aws_instance.smartdns' >/dev/null 2>&1; then
-              echo "EC2 instance already in Terraform state"
+            echo "🔍 Found existing EC2 instance: $INSTANCE_ID"
+            
+            # Check if already in Terraform state
+            if terraform state show 'aws_instance.smartdns[0]' >/dev/null 2>&1; then
+              STATE_ID=$(terraform state show 'aws_instance.smartdns[0]' | grep '^id ' | awk '{print $3}' || echo "")
+              if [ "$STATE_ID" = "$INSTANCE_ID" ]; then
+                echo "✅ Instance already in Terraform state with correct ID"
+              else
+                echo "⚠️ Instance in state ($STATE_ID) differs from existing ($INSTANCE_ID)"
+                echo "Removing old instance from state and importing correct one..."
+                terraform state rm 'aws_instance.smartdns[0]' 2>/dev/null || true
+                terraform import 'aws_instance.smartdns[0]' "$INSTANCE_ID" 2>&1 || echo "⚠️ Import failed"
+              fi
             else
-              echo "Importing EC2 instance into Terraform state..."
-              if terraform import 'aws_instance.smartdns' $INSTANCE_ID 2>&1; then
-                echo "✅ Successfully imported EC2 instance"
+              echo "📥 Importing existing EC2 instance into Terraform state (PREVENTS NEW CREATION)..."
+              if terraform import 'aws_instance.smartdns[0]' "$INSTANCE_ID" 2>&1; then
+                echo "✅ Successfully imported EC2 instance - NO NEW INSTANCE WILL BE CREATED"
                 
                 # Check if instance has an Elastic IP and import it
                 EIP_ALLOCATION=$(aws ec2 describe-addresses \
@@ -203,24 +215,36 @@ jobs:
                   fi
                 fi
               else
-                echo "⚠️ EC2 instance import failed, but continuing..."
+                echo "❌ CRITICAL: EC2 instance import failed!"
+                echo "This will cause Terraform to try to create a new instance."
+                echo "Aborting to prevent unnecessary costs..."
+                exit 1
               fi
-            else
-              echo "No existing EC2 instance found, will create new one"
             fi
+          else
+            echo "ℹ️ No existing EC2 instance found - will create new one (first time setup)"
           fi
           
           # Check for duplicate instances and warn
           ALL_INSTANCES=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=$INSTANCE_NAME" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[*].Instances[*].InstanceId' \
-            --output text --region us-east-2 2>/dev/null | tr '\t' '\n' | grep -v '^$' || echo "")
+            --filters "Name=tag:Name,Values=$INSTANCE_NAME" \
+            --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' \
+            --output text --region us-east-2 2>/dev/null | tr '\t' ' ' || echo "")
           
-          INSTANCE_COUNT=$(echo "$ALL_INSTANCES" | wc -l)
+          INSTANCE_COUNT=$(echo "$ALL_INSTANCES" | grep -v '^$' | wc -l)
           if [ "$INSTANCE_COUNT" -gt 1 ]; then
-            echo "⚠️ WARNING: Found $INSTANCE_COUNT running instances with name $INSTANCE_NAME"
+            echo "⚠️ WARNING: Found $INSTANCE_COUNT instances with name $INSTANCE_NAME"
             echo "Instances: $ALL_INSTANCES"
             echo "Terraform will manage only one instance. Consider terminating duplicates manually."
+          fi
+          
+          # Final safety check: Verify import was successful before proceeding
+          if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ] && [ "$INSTANCE_ID" != "" ]; then
+            if ! terraform state show 'aws_instance.smartdns[0]' >/dev/null 2>&1; then
+              echo "❌ CRITICAL: Instance exists but not in Terraform state!"
+              echo "Aborting to prevent duplicate instance creation..."
+              exit 1
+            fi
           fi
         working-directory: terraform
         continue-on-error: true

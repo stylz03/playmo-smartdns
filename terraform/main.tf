@@ -169,8 +169,23 @@ locals {
   eip_public_ip     = var.use_existing_eip && length(data.aws_eip.existing) > 0 ? data.aws_eip.existing[0].public_ip : (length(aws_eip.smartdns) > 0 ? aws_eip.smartdns[0].public_ip : null)
 }
 
-# EC2 instance
+# Data source to check if instance already exists (to prevent creation)
+data "aws_instances" "existing" {
+  filter {
+    name   = "tag:Name"
+    values = ["${var.project_name}-ec2"]
+  }
+  filter {
+    name   = "instance-state-name"
+    values = ["running", "stopped", "stopping", "pending"]
+  }
+}
+
+# EC2 instance - ONLY create if it doesn't exist
 resource "aws_instance" "smartdns" {
+  # Only create if no existing instance found
+  count = length(data.aws_instances.existing.ids) == 0 ? 1 : 0
+  
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
   subnet_id              = element(data.aws_subnets.default.ids, 0)
@@ -198,6 +213,8 @@ resource "aws_instance" "smartdns" {
       # This prevents user_data changes from triggering instance recreation
       user_data,
     ]
+    # Prevent destroy if instance exists
+    prevent_destroy = length(data.aws_instances.existing.ids) > 0 ? true : false
   }
 
   tags = {
@@ -205,13 +222,23 @@ resource "aws_instance" "smartdns" {
   }
 }
 
+# Get existing instance ID if resource wasn't created
+locals {
+  existing_instance_id = length(data.aws_instances.existing.ids) > 0 ? data.aws_instances.existing.ids[0] : null
+  instance_id_to_use   = length(aws_instance.smartdns) > 0 ? aws_instance.smartdns[0].id : local.existing_instance_id
+}
+
 # Associate Elastic IP with EC2 instance
 resource "aws_eip_association" "smartdns" {
-  instance_id   = aws_instance.smartdns.id
+  # Only create if we have an instance (either newly created or existing)
+  count = local.instance_id_to_use != null && local.eip_allocation_id != null ? 1 : 0
+  
+  instance_id   = local.instance_id_to_use
   allocation_id = local.eip_allocation_id
   
   lifecycle {
-    create_before_destroy = true
+    create_before_destroy = false
+    prevent_destroy       = true  # Prevent accidental disassociation
   }
 }
 
