@@ -46,77 +46,67 @@ else
     exit 1
 fi
 
-# Install and configure sniproxy for SNI-based HTTPS forwarding
-echo "Installing sniproxy..."
-# Install sniproxy from source (not in default repos)
-cd /tmp
-git clone https://github.com/dlundquist/sniproxy.git || echo "sniproxy repo already exists"
-cd sniproxy
-if [ ! -f /usr/local/sbin/sniproxy ]; then
-    ./autogen.sh
-    ./configure
-    make
-    make install
-fi
-
-# Create sniproxy user if it doesn't exist
-id -u sniproxy >/dev/null 2>&1 || useradd -r -s /bin/false sniproxy
-
-# Create sniproxy directory
-mkdir -p /etc/sniproxy
-
-# Download sync script for sniproxy config (with timeout and retry)
-echo "Downloading sniproxy config sync script..."
+# Install and configure Nginx with stream_ssl_preread_module for SNI-based HTTPS forwarding
+# This replaces sniproxy for better compatibility with modern streaming services
+echo "Installing Nginx with stream_ssl_preread_module..."
+# Download and run Nginx installation script
 if [ -n "${GITHUB_TOKEN}" ]; then
-    curl -s -f --max-time 30 --retry 3 --retry-delay 2 -H "Authorization: token ${GITHUB_TOKEN}" https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-sniproxy-config.sh -o /usr/local/bin/sync-sniproxy-config.sh || echo "Warning: Could not download sync script"
+    curl -s -f --max-time 60 --retry 3 --retry-delay 2 -H "Authorization: token ${GITHUB_TOKEN}" https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/install-nginx-stream.sh -o /tmp/install-nginx.sh || echo "Warning: Could not download Nginx install script"
 else
-    curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-sniproxy-config.sh -o /usr/local/bin/sync-sniproxy-config.sh || echo "Warning: Could not download sync script (private repo - token may be needed)"
+    curl -s -f --max-time 60 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/install-nginx-stream.sh -o /tmp/install-nginx.sh || echo "Warning: Could not download Nginx install script (private repo - token may be needed)"
 fi
-if [ -f /usr/local/bin/sync-sniproxy-config.sh ]; then
-    chmod +x /usr/local/bin/sync-sniproxy-config.sh
+if [ -f /tmp/install-nginx.sh ]; then
+    chmod +x /tmp/install-nginx.sh
+    bash /tmp/install-nginx.sh || echo "Warning: Nginx installation failed"
+fi
+
+# Create Nginx stream config directory
+mkdir -p /etc/nginx/conf.d
+
+# Download sync script for Nginx stream config (with timeout and retry)
+echo "Downloading Nginx stream config sync script..."
+if [ -n "${GITHUB_TOKEN}" ]; then
+    curl -s -f --max-time 30 --retry 3 --retry-delay 2 -H "Authorization: token ${GITHUB_TOKEN}" https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-nginx-stream-config.sh -o /usr/local/bin/sync-nginx-stream-config.sh || echo "Warning: Could not download sync script"
+else
+    curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-nginx-stream-config.sh -o /usr/local/bin/sync-nginx-stream-config.sh || echo "Warning: Could not download sync script (private repo - token may be needed)"
+fi
+if [ -f /usr/local/bin/sync-nginx-stream-config.sh ]; then
+    chmod +x /usr/local/bin/sync-nginx-stream-config.sh
     # Initial sync from services.json
-    EC2_IP_VAL="$${EC2_PUBLIC_IP:-3.151.46.11}"
     if [ -n "${GITHUB_TOKEN}" ]; then
         curl -s -f --max-time 30 --retry 3 --retry-delay 2 -H "Authorization: token ${GITHUB_TOKEN}" https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json -o /tmp/services.json
     else
         curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json -o /tmp/services.json || echo "Warning: Could not download services.json (private repo - token may be needed)"
     fi
     if [ -f /tmp/services.json ]; then
-        EC2_IP="$$EC2_IP_VAL" /usr/local/bin/sync-sniproxy-config.sh /tmp/services.json /etc/sniproxy/sniproxy.conf || echo "Warning: Initial sync failed"
+        /usr/local/bin/sync-nginx-stream-config.sh /tmp/services.json /etc/nginx/conf.d/stream.conf || echo "Warning: Initial Nginx config sync failed"
     fi
 fi
 
-# Set capabilities on sniproxy binary to allow binding to privileged ports
-# This allows sniproxy to bind to ports 80/443 without running as root
-setcap 'cap_net_bind_service=+ep' /usr/local/sbin/sniproxy 2>/dev/null || echo "Warning: Could not set capabilities, will run as root"
+# Ensure Nginx main config loads stream module
+if [ -f /etc/nginx/nginx.conf ]; then
+    # Backup original config
+    cp /etc/nginx/nginx.conf /etc/nginx/nginx.conf.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
+    
+    # Add stream module load if not present
+    if ! grep -q "load_module.*ngx_stream_module" /etc/nginx/nginx.conf; then
+        # Add at the top after any comments
+        sed -i '1a load_module /etc/nginx/modules/ngx_stream_module.so;' /etc/nginx/nginx.conf
+    fi
+    
+    # Add stream block include if not present
+    if ! grep -q "include.*stream" /etc/nginx/nginx.conf; then
+        # Add at the end before the closing brace
+        sed -i '$a include /etc/nginx/conf.d/stream.conf;' /etc/nginx/nginx.conf
+    fi
+fi
 
-# Create systemd service for sniproxy
-# Use Type=simple with -f flag (foreground mode) - this is the working configuration
-cat > /etc/systemd/system/sniproxy.service <<'SNIPROXY_SERVICE'
-[Unit]
-Description=SNI Proxy for SmartDNS
-After=network.target
-
-[Service]
-Type=simple
-User=root
-ExecStart=/usr/local/sbin/sniproxy -c /etc/sniproxy/sniproxy.conf -f
-ExecReload=/bin/kill -HUP $MAINPID
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-SNIPROXY_SERVICE
-
-# Enable and start sniproxy
+# Enable and start Nginx
 systemctl daemon-reload
-systemctl enable sniproxy
-systemctl start sniproxy || echo "Warning: sniproxy start failed, will retry after config sync"
+systemctl enable nginx
+systemctl start nginx || echo "Warning: Nginx start failed, will retry after config sync"
 
-echo "✅ sniproxy installed and configured"
+echo "✅ Nginx with stream_ssl_preread_module installed and configured"
 
 # Security hardening
 sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config || true

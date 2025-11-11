@@ -19,7 +19,7 @@ locals {
   us_cdn_ips        = jsondecode(file("${path.module}/us-cdn-ips.json"))
   
   # Generate BIND9 zone configuration
-  # Resolve streaming domains to EC2 Elastic IP so traffic flows through sniproxy
+  # Resolve streaming domains to EC2 Elastic IP so traffic flows through Nginx stream proxy
   # Note: We'll use a placeholder IP here, then update with actual EIP in the second locals block
   named_conf_local = join("\n\n", [
     for d in local.domain_list :
@@ -120,7 +120,7 @@ resource "aws_security_group" "smartdns_sg" {
   }
 
   ingress {
-    description = "SNI Proxy HTTPS"
+    description = "Nginx Stream Proxy HTTPS"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
@@ -128,7 +128,7 @@ resource "aws_security_group" "smartdns_sg" {
   }
 
   ingress {
-    description = "SNI Proxy HTTP"
+    description = "Nginx Stream Proxy HTTP"
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"

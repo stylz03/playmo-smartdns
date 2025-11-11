@@ -339,10 +339,10 @@ jobs:
           TF_VAR_existing_eip_address: ${{ steps.check_eip.outputs.existing_eip }}
           TF_VAR_github_token: ${{ secrets.GH_TOKEN }}
 
-      - name: Sync sniproxy config if services.json changed
+      - name: Sync Nginx stream config if services.json changed
         if: contains(github.event.head_commit.modified, 'services.json') || contains(github.event.head_commit.added, 'services.json') || github.event_name == 'workflow_dispatch'
         run: |
-          echo "Syncing services.json to sniproxy.conf on EC2 instance..."
+          echo "Syncing services.json to Nginx stream config on EC2 instance..."
           
           # Get EC2 instance ID
           INSTANCE_ID=$(aws ec2 describe-instances \
@@ -353,9 +353,6 @@ jobs:
           
           if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
             echo "Found instance: $INSTANCE_ID"
-            
-            # Get EC2 public IP
-            EC2_IP=$(terraform output -raw ec2_public_ip 2>&1 | grep -v "::debug::" | grep -v "Terraform exited" | grep -v "stdout:" | grep -v "stderr:" | grep -v "exitcode:" | tr -d '\n\r' | head -c 50 || echo "")
             
             # Download sync script to instance (with GitHub token if available)
             echo "Downloading sync script to EC2..."
@@ -369,17 +366,17 @@ jobs:
               --instance-ids "$INSTANCE_ID" \
               --document-name "AWS-RunShellScript" \
               --parameters "commands=[
-                '$CURL_CMD https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-sniproxy-config.sh -o /tmp/sync-sniproxy-config.sh',
-                'chmod +x /tmp/sync-sniproxy-config.sh',
+                '$CURL_CMD https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-nginx-stream-config.sh -o /tmp/sync-nginx-stream-config.sh',
+                'chmod +x /tmp/sync-nginx-stream-config.sh',
                 '$CURL_CMD https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json -o /tmp/services.json',
-                'EC2_IP=$EC2_IP /tmp/sync-sniproxy-config.sh /tmp/services.json /etc/sniproxy/sniproxy.conf'
+                '/tmp/sync-nginx-stream-config.sh /tmp/services.json /etc/nginx/conf.d/stream.conf'
               ]" \
               --region us-east-2 \
               --output text > /dev/null 2>&1 || echo "⚠️ SSM command failed, will sync manually via SSH"
             
-            echo "✅ sniproxy config sync initiated"
+            echo "✅ Nginx stream config sync initiated"
           else
-            echo "⚠️ Instance not found, skipping sniproxy sync (will sync on next deployment)"
+            echo "⚠️ Instance not found, skipping Nginx stream config sync (will sync on next deployment)"
           fi
         working-directory: terraform
         continue-on-error: true
