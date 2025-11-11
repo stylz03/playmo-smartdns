@@ -3,7 +3,7 @@ set -euo pipefail
 
 apt-get update -y
 apt-get upgrade -y
-apt-get install -y bind9 bind9utils bind9-dnsutils unattended-upgrades fail2ban squid
+apt-get install -y bind9 bind9utils bind9-dnsutils unattended-upgrades fail2ban build-essential libev-dev libpcre3-dev
 
 # Bind9 global options (optimized for US-based SmartDNS)
 cat > /etc/bind/named.conf.options <<'EOF'
@@ -17,13 +17,14 @@ mkdir -p /etc/bind/zones
 # This keeps user_data under 16KB limit
 echo "Zone files will be created by setup script..."
 
-# Download and run zone file setup script
+# Download and run zone file setup script for sniproxy
 echo "Downloading zone file setup script..."
-curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/setup-all-static-ips.sh -o /tmp/setup-zones.sh || echo "Warning: Could not download zone setup script"
-if [ -f /tmp/setup-zones.sh ]; then
-    chmod +x /tmp/setup-zones.sh
-    # Run only the zone file creation part (not the named.conf.local update)
-    bash /tmp/setup-zones.sh --zones-only || echo "Warning: Zone setup script failed, will use forwarding only"
+curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/create-zone-files-sniproxy.sh -o /tmp/create-zones.sh || echo "Warning: Could not download zone setup script"
+if [ -f /tmp/create-zones.sh ]; then
+    chmod +x /tmp/create-zones.sh
+    # Run zone file creation with EC2 IP (from Terraform variable)
+    EC2_IP_VAL="${EC2_PUBLIC_IP:-3.151.46.11}"
+    bash /tmp/create-zones.sh "$$EC2_IP_VAL" || echo "Warning: Zone setup script failed"
 fi
 
 # Inject selective forward zones and static zones
@@ -41,130 +42,62 @@ else
     exit 1
 fi
 
-# Install and configure Squid proxy for streaming domains
-echo "Configuring Squid proxy..."
-# Backup default config
-cp /etc/squid/squid.conf /etc/squid/squid.conf.backup
-
-# Create streaming domains list
-cat > /etc/squid/streaming-domains.txt <<'STREAMING_DOMAINS'
-netflix.com
-nflxvideo.net
-hulu.com
-disneyplus.com
-bamgrid.com
-hbomax.com
-max.com
-peacocktv.com
-paramountplus.com
-paramount.com
-espn.com
-espnplus.com
-primevideo.com
-amazonvideo.com
-tv.apple.com
-sling.com
-discoveryplus.com
-tubi.tv
-crackle.com
-roku.com
-tntdrama.com
-tbs.com
-flosports.tv
-magellantv.com
-aetv.com
-directv.com
-britbox.com
-dazn.com
-fubo.tv
-philo.com
-dishanywhere.com
-xumo.tv
-hgtv.com
-amcplus.com
-mgmplus.com
-STREAMING_DOMAINS
-
-# Create Squid configuration
-cat > /etc/squid/squid.conf <<'SQUID_CONF'
-# Squid configuration for SmartDNS proxy
-# Only proxy streaming domains, allow direct access for others
-
-http_port 3128
-
-# ACL for streaming domains
-acl streaming_domains dstdomain "/etc/squid/streaming-domains.txt"
-
-# ACL for whitelisted IPs (will be updated dynamically)
-acl whitelisted_ips src "/etc/squid/whitelisted-ips.txt"
-
-# Allow whitelisted IPs to use proxy for streaming domains
-http_access allow whitelisted_ips streaming_domains
-
-# Deny all other proxy requests
-http_access deny all
-
-# Allow direct access (no proxy) for non-streaming domains
-# This is handled by client configuration - clients only use proxy for streaming
-
-# Forward to destination (transparent proxy)
-forwarded_for on
-via off
-
-# Cache settings (minimal caching for streaming)
-cache deny all
-maximum_object_size 0 KB
-
-# Logging
-access_log /var/log/squid/access.log squid
-cache_log /var/log/squid/cache.log
-
-# DNS settings (use local BIND9)
-dns_nameservers 127.0.0.1
-
-# Performance
-max_filedescriptors 4096
-SQUID_CONF
-
-# Create empty whitelisted IPs file (will be updated by API)
-touch /etc/squid/whitelisted-ips.txt
-chmod 644 /etc/squid/whitelisted-ips.txt
-
-# Create script to update whitelisted IPs
-cat > /usr/local/bin/update-squid-acl.sh <<'UPDATE_SCRIPT'
-#!/bin/bash
-# Update Squid ACL with whitelisted IPs from security group
-# This script is called by the API when IPs are whitelisted
-
-SECURITY_GROUP_ID="$${1:-}"
-if [ -z "$$SECURITY_GROUP_ID" ]; then
-    echo "Usage: $$0 <security-group-id>"
-    exit 1
+# Install and configure sniproxy for SNI-based HTTPS forwarding
+echo "Installing sniproxy..."
+# Install sniproxy from source (not in default repos)
+cd /tmp
+git clone https://github.com/dlundquist/sniproxy.git || echo "sniproxy repo already exists"
+cd sniproxy
+if [ ! -f /usr/sbin/sniproxy ]; then
+    ./autogen.sh
+    ./configure
+    make
+    make install
 fi
 
-# Get whitelisted IPs from security group (port 3128)
-aws ec2 describe-security-groups \
-    --group-ids "$$SECURITY_GROUP_ID" \
-    --query 'SecurityGroups[0].IpPermissions[?FromPort==`3128`].IpRanges[*].CidrIp' \
-    --output text | tr '\t' '\n' | sed 's/\/32$$//' > /tmp/whitelisted-ips.txt
+# Create sniproxy user if it doesn't exist
+id -u sniproxy >/dev/null 2>&1 || useradd -r -s /bin/false sniproxy
 
-# Update Squid ACL file
-mv /tmp/whitelisted-ips.txt /etc/squid/whitelisted-ips.txt
-chmod 644 /etc/squid/whitelisted-ips.txt
+# Create sniproxy directory
+mkdir -p /etc/sniproxy
 
-# Reload Squid configuration
-squid -k reconfigure
+# Download sync script for sniproxy config
+echo "Downloading sniproxy config sync script..."
+curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-sniproxy-config.sh -o /usr/local/bin/sync-sniproxy-config.sh || echo "Warning: Could not download sync script"
+if [ -f /usr/local/bin/sync-sniproxy-config.sh ]; then
+    chmod +x /usr/local/bin/sync-sniproxy-config.sh
+    # Initial sync from services.json
+    EC2_IP_VAL="${EC2_PUBLIC_IP:-3.151.46.11}"
+    curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json -o /tmp/services.json
+    if [ -f /tmp/services.json ]; then
+        EC2_IP="$$EC2_IP_VAL" /usr/local/bin/sync-sniproxy-config.sh /tmp/services.json /etc/sniproxy/sniproxy.conf || echo "Warning: Initial sync failed"
+    fi
+fi
 
-echo "Updated Squid ACL with whitelisted IPs"
-UPDATE_SCRIPT
+# Create systemd service for sniproxy
+cat > /etc/systemd/system/sniproxy.service <<'SNIPROXY_SERVICE'
+[Unit]
+Description=SNI Proxy for SmartDNS
+After=network.target
 
-chmod +x /usr/local/bin/update-squid-acl.sh
+[Service]
+Type=forking
+User=sniproxy
+ExecStart=/usr/sbin/sniproxy -c /etc/sniproxy/sniproxy.conf
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
 
-# Enable and start Squid
-systemctl enable squid
-systemctl start squid
+[Install]
+WantedBy=multi-user.target
+SNIPROXY_SERVICE
 
-echo "✅ Squid proxy configured"
+# Enable and start sniproxy
+systemctl daemon-reload
+systemctl enable sniproxy
+systemctl start sniproxy || echo "Warning: sniproxy start failed, will retry after config sync"
+
+echo "✅ sniproxy installed and configured"
 
 # Security hardening
 sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config || true

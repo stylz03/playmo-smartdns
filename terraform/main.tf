@@ -18,43 +18,11 @@ locals {
   domain_list       = [for k, v in local.streaming_domains : k if v]
   us_cdn_ips        = jsondecode(file("${path.module}/us-cdn-ips.json"))
   
-  # Generate BIND9 zone configuration
-  # Use static A records for domains with US CDN IPs, forward for others
-  named_conf_local = join("\n\n", [
-    for d in local.domain_list :
-    contains(keys(local.us_cdn_ips), d) ? 
-    <<EOT
-zone "${d}" {
-    type master;
-    file "/etc/bind/zones/db.${replace(d, ".", "_")}";
-};
-EOT
-    :
-    <<EOT
-zone "${d}" {
-    type forward;
-    forwarders { 8.8.8.8; 8.8.4.4; 1.1.1.1; 1.0.0.1; };
-    forward only;
-};
-EOT
-  ])
+  # Note: named_conf_local and eip_public_ip are defined later after EIP resources are created
   
-  # Generate zone file contents for domains with static IPs
-  zone_files = {
-    for d in local.domain_list :
-    d => contains(keys(local.us_cdn_ips), d) ? join("\n", [
-      "$$TTL    604800",
-      "@       IN      SOA     ns1.smartdns.local. admin.smartdns.local. (",
-      "                        ${formatdate("YYYYMMDDHH", timestamp())}         ; Serial",
-      "                        604800             ; Refresh",
-      "                        86400              ; Retry",
-      "                        2419200            ; Expire",
-      "                        604800 )           ; Negative Cache TTL",
-      ";",
-      "@       IN      NS      ns1.smartdns.local.",
-      join("\n", [for ip in local.us_cdn_ips[d] : "@       IN      A       ${ip}"])
-    ]) : null
-  }
+  # Generate zone file contents for streaming domains
+  # Resolve to EC2 Elastic IP so traffic flows through sniproxy
+  # Note: eip_public_ip is defined later in locals block after EIP resources
   
   # BIND9 options optimized for US-based SmartDNS
   # Since EC2 is in us-east-2 (Ohio, USA), queries from BIND9 will appear
@@ -137,11 +105,19 @@ resource "aws_security_group" "smartdns_sg" {
   }
 
   ingress {
-    description = "Proxy HTTP (Squid)"
-    from_port   = 3128
-    to_port     = 3128
+    description = "SNI Proxy HTTPS"
+    from_port   = 443
+    to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Will be restricted by Squid ACLs based on whitelisted IPs
+    cidr_blocks = ["0.0.0.0/0"]  # Will be restricted by security group whitelisting
+  }
+
+  ingress {
+    description = "SNI Proxy HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # Will be restricted by security group whitelisting
   }
 
   egress {
@@ -200,6 +176,7 @@ resource "aws_instance" "smartdns" {
     FIREBASE_CREDENTIALS = var.firebase_credentials != null ? var.firebase_credentials : ""
     LAMBDA_WHITELIST_URL = local.lambda_url
     SECURITY_GROUP_ID    = aws_security_group.smartdns_sg.id
+    EC2_PUBLIC_IP        = local.eip_public_ip
   })
   
   # Lambda URL will be set after Lambda is created

@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'services.json'  # Trigger on services.json changes for sniproxy sync
   workflow_dispatch:   # allow manual runs
   schedule:
     - cron: "0 7 * * *"   # run daily at 07:00 UTC for auto re-validation
@@ -268,6 +270,45 @@ jobs:
           TF_VAR_lambda_whitelist_url: ${{ secrets.LAMBDA_WHITELIST_URL }}
           TF_VAR_use_existing_eip: ${{ steps.check_eip.outputs.use_existing }}
           TF_VAR_existing_eip_address: ${{ steps.check_eip.outputs.existing_eip }}
+
+      - name: Sync sniproxy config if services.json changed
+        if: contains(github.event.head_commit.modified, 'services.json') || contains(github.event.head_commit.added, 'services.json') || github.event_name == 'workflow_dispatch'
+        run: |
+          echo "Syncing services.json to sniproxy.conf on EC2 instance..."
+          
+          # Get EC2 instance ID
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --region us-east-2 \
+            --filters "Name=tag:Name,Values=playmo-smartdns-dns-only-ec2" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
+            echo "Found instance: $INSTANCE_ID"
+            
+            # Get EC2 public IP
+            EC2_IP=$(terraform output -raw ec2_public_ip 2>&1 | grep -v "::debug::" | grep -v "Terraform exited" | grep -v "stdout:" | grep -v "stderr:" | grep -v "exitcode:" | tr -d '\n\r' | head -c 50 || echo "")
+            
+            # Download sync script to instance
+            echo "Downloading sync script to EC2..."
+            aws ssm send-command \
+              --instance-ids "$INSTANCE_ID" \
+              --document-name "AWS-RunShellScript" \
+              --parameters "commands=[
+                'curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-sniproxy-config.sh -o /tmp/sync-sniproxy-config.sh',
+                'chmod +x /tmp/sync-sniproxy-config.sh',
+                'curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json -o /tmp/services.json',
+                'EC2_IP=$EC2_IP /tmp/sync-sniproxy-config.sh /tmp/services.json /etc/sniproxy/sniproxy.conf'
+              ]" \
+              --region us-east-2 \
+              --output text > /dev/null 2>&1 || echo "⚠️ SSM command failed, will sync manually via SSH"
+            
+            echo "✅ sniproxy config sync initiated"
+          else
+            echo "⚠️ Instance not found, skipping sniproxy sync (will sync on next deployment)"
+          fi
+        working-directory: terraform
+        continue-on-error: true
 
       - name: Clean up unused EIPs after deployment
         run: |

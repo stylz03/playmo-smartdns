@@ -246,20 +246,9 @@ def add_client_ip(client_id):
                     ip_doc_data['is_whitelisted'] = True
                     ip_doc_data['whitelisted_at'] = firestore.SERVER_TIMESTAMP
                     
-                    # Update Squid ACL with whitelisted IPs
-                    if SECURITY_GROUP_ID:
-                        try:
-                            subprocess.run(
-                                ['/usr/local/bin/update-squid-acl.sh', SECURITY_GROUP_ID],
-                                check=True,
-                                timeout=10,
-                                capture_output=True
-                            )
-                            logger.info(f"Updated Squid ACL for IP {ip_address}")
-                        except subprocess.CalledProcessError as e:
-                            logger.warning(f"Failed to update Squid ACL: {e}")
-                        except Exception as e:
-                            logger.warning(f"Error updating Squid ACL: {e}")
+                    # Note: IP whitelisting is handled by security group rules
+                    # sniproxy doesn't need ACL updates as it forwards transparently
+                    logger.info(f"IP {ip_address} whitelisted via security group")
             except Exception as e:
                 logger.warning(f"Failed to whitelist IP via Lambda: {e}")
         
