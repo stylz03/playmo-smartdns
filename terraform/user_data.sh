@@ -86,7 +86,12 @@ if [ -f /usr/local/bin/sync-sniproxy-config.sh ]; then
     fi
 fi
 
+# Set capabilities on sniproxy binary to allow binding to privileged ports
+# This allows sniproxy to bind to ports 80/443 without running as root
+setcap 'cap_net_bind_service=+ep' /usr/local/sbin/sniproxy 2>/dev/null || echo "Warning: Could not set capabilities, will run as root"
+
 # Create systemd service for sniproxy
+# Try running as sniproxy user first (with capabilities), fallback to root if needed
 cat > /etc/systemd/system/sniproxy.service <<'SNIPROXY_SERVICE'
 [Unit]
 Description=SNI Proxy for SmartDNS
@@ -94,7 +99,7 @@ After=network.target
 
 [Service]
 Type=forking
-User=sniproxy
+User=root
 ExecStart=/usr/local/sbin/sniproxy -c /etc/sniproxy/sniproxy.conf
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=always

@@ -30,7 +30,7 @@ if [ -z "$EC2_IP" ]; then
     EC2_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "3.151.46.11")
 fi
 
-# Generate sniproxy.conf
+# Generate sniproxy.conf using named table syntax (correct format)
 cat > "$SNIPROXY_CONF_TMP" <<EOF
 # sniproxy configuration
 # Auto-generated from services.json
@@ -44,13 +44,11 @@ error_log {
     priority notice
 }
 
-# Table for streaming domains
-table {
-    # Forward streaming domains to their original destination
-    # This allows SNI-based routing while maintaining US-based traffic
+# Named table for streaming domains
+table streaming_domains {
 EOF
 
-# Add each streaming domain
+# Add each streaming domain to the named table
 while IFS= read -r domain; do
     if [ -n "$domain" ]; then
         echo "    .${domain}" >> "$SNIPROXY_CONF_TMP"
@@ -63,41 +61,13 @@ cat >> "$SNIPROXY_CONF_TMP" <<EOF
 # Listen on port 443 for HTTPS traffic
 listen 0.0.0.0:443 {
     proto tls
-    table {
-        # Forward to original destination (transparent proxy)
-        # This allows SNI inspection and forwarding
-EOF
-
-# Add domains to listen block
-while IFS= read -r domain; do
-    if [ -n "$domain" ]; then
-        echo "        .${domain}" >> "$SNIPROXY_CONF_TMP"
-    fi
-done <<< "$DOMAINS"
-
-cat >> "$SNIPROXY_CONF_TMP" <<EOF
-    }
-    # Forward to original destination (transparent mode)
-    fallback {
-        # If SNI doesn't match, forward to original destination
-    }
+    table streaming_domains
 }
 
-# Listen on port 80 for HTTP traffic (redirects)
+# Listen on port 80 for HTTP traffic
 listen 0.0.0.0:80 {
     proto http
-    table {
-EOF
-
-# Add domains to HTTP listen block
-while IFS= read -r domain; do
-    if [ -n "$domain" ]; then
-        echo "        .${domain}" >> "$SNIPROXY_CONF_TMP"
-    fi
-done <<< "$DOMAINS"
-
-cat >> "$SNIPROXY_CONF_TMP" <<EOF
-    }
+    table streaming_domains
 }
 EOF
 
