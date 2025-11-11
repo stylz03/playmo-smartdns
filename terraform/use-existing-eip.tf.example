@@ -1,0 +1,21 @@
+# Example: How to use an existing Elastic IP instead of creating a new one
+# Uncomment and modify this if you want to use an existing EIP
+
+# Option 1: Use data source to find existing EIP by IP address
+# data "aws_eip" "existing" {
+#   public_ip = "3.151.46.11"
+# }
+# 
+# Then use it in the association:
+# resource "aws_eip_association" "smartdns" {
+#   instance_id   = aws_instance.smartdns.id
+#   allocation_id = data.aws_eip.existing.id
+# }
+# 
+# And remove or comment out:
+# resource "aws_eip" "smartdns" { ... }
+
+# Option 2: Import existing EIP into Terraform state
+# terraform import aws_eip.smartdns eipalloc-xxxxx
+# (Get allocation ID from: aws ec2 describe-addresses --public-ips 3.151.46.11)
+

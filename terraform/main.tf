@@ -157,8 +157,16 @@ resource "aws_security_group" "smartdns_sg" {
   }
 }
 
-# Elastic IP for static public IP
+# Try to use existing Elastic IP first, create new if it doesn't exist
+# Check for old IP: 3.151.46.11
+data "aws_eip" "existing" {
+  count   = var.use_existing_eip ? 1 : 0
+  public_ip = var.existing_eip_address
+}
+
+# Elastic IP for static public IP (only create if not using existing)
 resource "aws_eip" "smartdns" {
+  count  = var.use_existing_eip ? 0 : 1
   domain = "vpc"
   
   lifecycle {
@@ -170,6 +178,12 @@ resource "aws_eip" "smartdns" {
     Name = "${var.project_name}-eip"
     Project = var.project_name
   }
+}
+
+# Local to determine which EIP to use
+locals {
+  eip_allocation_id = var.use_existing_eip ? data.aws_eip.existing[0].id : aws_eip.smartdns[0].id
+  eip_public_ip     = var.use_existing_eip ? data.aws_eip.existing[0].public_ip : aws_eip.smartdns[0].public_ip
 }
 
 # EC2 instance

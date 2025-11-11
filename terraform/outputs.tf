@@ -1,11 +1,11 @@
 output "ec2_public_ip" {
   description = "Public IP (Elastic IP) of the SmartDNS EC2 instance"
-  value       = aws_eip.smartdns.public_ip
+  value       = local.eip_public_ip
 }
 
 output "ec2_elastic_ip" {
   description = "Elastic IP address (static) of the SmartDNS EC2 instance"
-  value       = aws_eip.smartdns.public_ip
+  value       = local.eip_public_ip
 }
 
 output "lambda_function_url" {
@@ -25,5 +25,5 @@ output "aws_region" {
 
 output "api_url" {
   description = "Public URL of the SmartDNS API"
-  value       = "http://${aws_eip.smartdns.public_ip}:5000"
+  value       = "http://${local.eip_public_ip}:5000"
 }

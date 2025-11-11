@@ -193,6 +193,28 @@ jobs:
         working-directory: terraform
         continue-on-error: true
 
+      - name: Check for existing Elastic IP
+        id: check_eip
+        run: |
+          OLD_EIP="3.151.46.11"
+          EIP_EXISTS=$(aws ec2 describe-addresses \
+            --region us-east-2 \
+            --filters "Name=public-ip,Values=$OLD_EIP" \
+            --query 'Addresses[0].AllocationId' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$EIP_EXISTS" ] && [ "$EIP_EXISTS" != "None" ] && [ "$EIP_EXISTS" != "" ]; then
+            echo "✅ Old Elastic IP $OLD_EIP exists! Allocation ID: $EIP_EXISTS"
+            echo "use_existing=true" >> $GITHUB_OUTPUT
+            echo "existing_eip=$OLD_EIP" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Old Elastic IP $OLD_EIP does not exist. Using new EIP."
+            echo "use_existing=false" >> $GITHUB_OUTPUT
+            echo "existing_eip=" >> $GITHUB_OUTPUT
+          fi
+        working-directory: terraform
+        continue-on-error: true
+
       - name: Terraform Plan
         run: terraform plan -out=tfplan
         working-directory: terraform
@@ -200,6 +222,8 @@ jobs:
         env:
           TF_VAR_firebase_credentials: ${{ secrets.FIREBASE_CREDENTIALS }}
           TF_VAR_lambda_whitelist_url: ${{ secrets.LAMBDA_WHITELIST_URL }}
+          TF_VAR_use_existing_eip: ${{ steps.check_eip.outputs.use_existing }}
+          TF_VAR_existing_eip_address: ${{ steps.check_eip.outputs.existing_eip }}
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
