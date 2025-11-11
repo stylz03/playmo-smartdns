@@ -135,6 +135,14 @@ resource "aws_security_group" "smartdns_sg" {
     cidr_blocks = ["0.0.0.0/0"]  # Will be restricted by security group whitelisting
   }
 
+  ingress {
+    description = "WireGuard VPN"
+    from_port   = 51820
+    to_port     = 51820
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]  # Will be restricted by security group whitelisting
+  }
+
   egress {
     description = "All"
     from_port   = 0

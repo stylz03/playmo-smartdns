@@ -117,6 +117,30 @@ systemctl start nginx || echo "Warning: Nginx start failed, will retry after con
 
 echo "✅ Nginx with stream_ssl_preread_module installed and configured"
 
+# Install and configure WireGuard VPN server for split-tunneling
+echo "Installing WireGuard VPN server..."
+if [ -n "${GITHUB_TOKEN}" ]; then
+    curl -s -f --max-time 60 --retry 3 --retry-delay 2 -H "Authorization: token ${GITHUB_TOKEN}" https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/install-wireguard-server.sh -o /tmp/install-wireguard.sh || echo "Warning: Could not download WireGuard install script"
+else
+    curl -s -f --max-time 60 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/install-wireguard-server.sh -o /tmp/install-wireguard.sh || echo "Warning: Could not download WireGuard install script (private repo - token may be needed)"
+fi
+if [ -f /tmp/install-wireguard.sh ]; then
+    chmod +x /tmp/install-wireguard.sh
+    bash /tmp/install-wireguard.sh || echo "Warning: WireGuard installation failed"
+fi
+
+# Download helper scripts for WireGuard client management
+if [ -n "${GITHUB_TOKEN}" ]; then
+    curl -s -f --max-time 30 --retry 3 --retry-delay 2 -H "Authorization: token ${GITHUB_TOKEN}" https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/add-wireguard-client.sh -o /usr/local/bin/add-wireguard-client.sh || echo "Warning: Could not download add-wireguard-client script"
+else
+    curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/add-wireguard-client.sh -o /usr/local/bin/add-wireguard-client.sh || echo "Warning: Could not download add-wireguard-client script"
+fi
+if [ -f /usr/local/bin/add-wireguard-client.sh ]; then
+    chmod +x /usr/local/bin/add-wireguard-client.sh
+fi
+
+echo "✅ WireGuard VPN server installed and configured"
+
 # Security hardening
 sed -i 's/^#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config || true
 systemctl restart ssh || true
