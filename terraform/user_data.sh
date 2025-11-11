@@ -19,7 +19,7 @@ echo "Zone files will be created by setup script..."
 
 # Download and run zone file setup script for sniproxy
 echo "Downloading zone file setup script..."
-curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/create-zone-files-sniproxy.sh -o /tmp/create-zones.sh || echo "Warning: Could not download zone setup script"
+curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/create-zone-files-sniproxy.sh -o /tmp/create-zones.sh || echo "Warning: Could not download zone setup script"
 if [ -f /tmp/create-zones.sh ]; then
     chmod +x /tmp/create-zones.sh
     # Run zone file creation with EC2 IP (from Terraform variable)
@@ -61,14 +61,14 @@ id -u sniproxy >/dev/null 2>&1 || useradd -r -s /bin/false sniproxy
 # Create sniproxy directory
 mkdir -p /etc/sniproxy
 
-# Download sync script for sniproxy config
+# Download sync script for sniproxy config (with timeout and retry)
 echo "Downloading sniproxy config sync script..."
-curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-sniproxy-config.sh -o /usr/local/bin/sync-sniproxy-config.sh || echo "Warning: Could not download sync script"
+curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-sniproxy-config.sh -o /usr/local/bin/sync-sniproxy-config.sh || echo "Warning: Could not download sync script"
 if [ -f /usr/local/bin/sync-sniproxy-config.sh ]; then
     chmod +x /usr/local/bin/sync-sniproxy-config.sh
     # Initial sync from services.json
     EC2_IP_VAL="$${EC2_PUBLIC_IP:-3.151.46.11}"
-    curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json -o /tmp/services.json
+    curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json -o /tmp/services.json
     if [ -f /tmp/services.json ]; then
         EC2_IP="$$EC2_IP_VAL" /usr/local/bin/sync-sniproxy-config.sh /tmp/services.json /etc/sniproxy/sniproxy.conf || echo "Warning: Initial sync failed"
     fi
