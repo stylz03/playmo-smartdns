@@ -2,15 +2,15 @@
 
 ## Current Configuration
 
-**Elastic IP:** `3.151.75.152`  
-**API URL:** `http://3.151.75.152:5000`  
-**Proxy:** `3.151.75.152:3128`  
-**DNS Server:** `3.151.75.152`  
+**Elastic IP:** `3.151.46.11`  
+**API URL:** `http://3.151.46.11:5000`  
+**Proxy:** `3.151.46.11:3128`  
+**DNS Server:** `3.151.46.11`  
 **Region:** `us-east-2` (Ohio, USA)
 
 ## Previous IP
 
-**Old IP:** `3.151.46.11` (may still exist in AWS as unassociated EIP)
+**Previous IP:** `3.151.75.152` (released automatically to prevent charges)
 
 ## Client Configuration
 
@@ -29,18 +29,18 @@ Set your device DNS to: **3.151.75.152**
 
 ```bash
 # Test DNS
-dig @3.151.75.152 netflix.com +short
+dig @3.151.46.11 netflix.com +short
 
 # Test API
-curl http://3.151.75.152:5000/health
+curl http://3.151.46.11:5000/health
 
 # Register IP
-curl -X POST http://3.151.75.152:5000/api/clients/test/ips \
+curl -X POST http://3.151.46.11:5000/api/clients/test/ips \
   -H "Content-Type: application/json" \
   -d '{"ip_address": "YOUR_IP", "source": "manual"}'
 
 # Test proxy
-curl -x http://3.151.75.152:3128 http://netflix.com
+curl -x http://3.151.46.11:3128 http://netflix.com
 ```
 
 ## If IP Changes Again
