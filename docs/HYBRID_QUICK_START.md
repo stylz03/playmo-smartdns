@@ -37,21 +37,18 @@ cat /etc/wireguard/server-info.txt
 
 # Download scripts (if not already there)
 cd /tmp
-curl -H "Authorization: token YOUR_GITHUB_TOKEN" \
-  https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/generate-streaming-ip-ranges.sh \
+curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/generate-streaming-ip-ranges.sh \
   -o generate-streaming-ip-ranges.sh
 chmod +x generate-streaming-ip-ranges.sh
 
-curl -H "Authorization: token YOUR_GITHUB_TOKEN" \
-  https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json \
+curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json \
   -o services.json
 
 # Generate streaming IP ranges
 ./generate-streaming-ip-ranges.sh services.json streaming-ip-ranges.txt
 
 # Generate client config
-curl -H "Authorization: token YOUR_GITHUB_TOKEN" \
-  https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/generate-wireguard-client-config.sh \
+curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/generate-wireguard-client-config.sh \
   -o generate-wireguard-client-config.sh
 chmod +x generate-wireguard-client-config.sh
 

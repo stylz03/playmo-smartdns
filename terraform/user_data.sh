@@ -19,11 +19,7 @@ echo "Zone files will be created by setup script..."
 
 # Download and run zone file setup script for sniproxy
 echo "Downloading zone file setup script..."
-if [ -n "${GITHUB_TOKEN}" ]; then
-    curl -s -f --max-time 30 --retry 3 --retry-delay 2 -H "Authorization: token ${GITHUB_TOKEN}" https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/create-zone-files-sniproxy.sh -o /tmp/create-zones.sh || echo "Warning: Could not download zone setup script"
-else
-    curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/create-zone-files-sniproxy.sh -o /tmp/create-zones.sh || echo "Warning: Could not download zone setup script (private repo - token may be needed)"
-fi
+curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/create-zone-files-sniproxy.sh -o /tmp/create-zones.sh || echo "Warning: Could not download zone setup script"
 if [ -f /tmp/create-zones.sh ]; then
     chmod +x /tmp/create-zones.sh
     # Run zone file creation with EC2 IP (from Terraform variable)
@@ -50,11 +46,7 @@ fi
 # This replaces sniproxy for better compatibility with modern streaming services
 echo "Installing Nginx with stream_ssl_preread_module..."
 # Download and run Nginx installation script
-if [ -n "${GITHUB_TOKEN}" ]; then
-    curl -s -f --max-time 60 --retry 3 --retry-delay 2 -H "Authorization: token ${GITHUB_TOKEN}" https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/install-nginx-stream.sh -o /tmp/install-nginx.sh || echo "Warning: Could not download Nginx install script"
-else
-    curl -s -f --max-time 60 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/install-nginx-stream.sh -o /tmp/install-nginx.sh || echo "Warning: Could not download Nginx install script (private repo - token may be needed)"
-fi
+curl -s -f --max-time 60 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/install-nginx-stream.sh -o /tmp/install-nginx.sh || echo "Warning: Could not download Nginx install script"
 if [ -f /tmp/install-nginx.sh ]; then
     chmod +x /tmp/install-nginx.sh
     bash /tmp/install-nginx.sh || echo "Warning: Nginx installation failed"
@@ -71,19 +63,12 @@ fi
 
 # Download sync script for Nginx stream config (with timeout and retry)
 echo "Downloading Nginx stream config sync script..."
-if [ -n "${GITHUB_TOKEN}" ]; then
-    curl -s -f --max-time 30 --retry 3 --retry-delay 2 -H "Authorization: token ${GITHUB_TOKEN}" https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-nginx-stream-config.sh -o /usr/local/bin/sync-nginx-stream-config.sh || echo "Warning: Could not download sync script"
-else
-    curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-nginx-stream-config.sh -o /usr/local/bin/sync-nginx-stream-config.sh || echo "Warning: Could not download sync script (private repo - token may be needed)"
-fi
+curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/sync-nginx-stream-config.sh -o /usr/local/bin/sync-nginx-stream-config.sh || echo "Warning: Could not download sync script"
 if [ -f /usr/local/bin/sync-nginx-stream-config.sh ]; then
     chmod +x /usr/local/bin/sync-nginx-stream-config.sh
     # Initial sync from services.json
-    if [ -n "${GITHUB_TOKEN}" ]; then
-        curl -s -f --max-time 30 --retry 3 --retry-delay 2 -H "Authorization: token ${GITHUB_TOKEN}" https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json -o /tmp/services.json
-    else
-        curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json -o /tmp/services.json || echo "Warning: Could not download services.json (private repo - token may be needed)"
-    fi
+    curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json -o /tmp/services.json || echo "Warning: Could not download services.json"
+fi
     if [ -f /tmp/services.json ]; then
         /usr/local/bin/sync-nginx-stream-config.sh /tmp/services.json /etc/nginx/conf.d/stream.conf || echo "Warning: Initial Nginx config sync failed"
     fi
@@ -119,22 +104,14 @@ echo "✅ Nginx with stream_ssl_preread_module installed and configured"
 
 # Install and configure WireGuard VPN server for split-tunneling
 echo "Installing WireGuard VPN server..."
-if [ -n "${GITHUB_TOKEN}" ]; then
-    curl -s -f --max-time 60 --retry 3 --retry-delay 2 -H "Authorization: token ${GITHUB_TOKEN}" https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/install-wireguard-server.sh -o /tmp/install-wireguard.sh || echo "Warning: Could not download WireGuard install script"
-else
-    curl -s -f --max-time 60 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/install-wireguard-server.sh -o /tmp/install-wireguard.sh || echo "Warning: Could not download WireGuard install script (private repo - token may be needed)"
-fi
+curl -s -f --max-time 60 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/install-wireguard-server.sh -o /tmp/install-wireguard.sh || echo "Warning: Could not download WireGuard install script"
 if [ -f /tmp/install-wireguard.sh ]; then
     chmod +x /tmp/install-wireguard.sh
     bash /tmp/install-wireguard.sh || echo "Warning: WireGuard installation failed"
 fi
 
 # Download helper scripts for WireGuard client management
-if [ -n "${GITHUB_TOKEN}" ]; then
-    curl -s -f --max-time 30 --retry 3 --retry-delay 2 -H "Authorization: token ${GITHUB_TOKEN}" https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/add-wireguard-client.sh -o /usr/local/bin/add-wireguard-client.sh || echo "Warning: Could not download add-wireguard-client script"
-else
-    curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/add-wireguard-client.sh -o /usr/local/bin/add-wireguard-client.sh || echo "Warning: Could not download add-wireguard-client script"
-fi
+curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/add-wireguard-client.sh -o /usr/local/bin/add-wireguard-client.sh || echo "Warning: Could not download add-wireguard-client script"
 if [ -f /usr/local/bin/add-wireguard-client.sh ]; then
     chmod +x /usr/local/bin/add-wireguard-client.sh
 fi
@@ -168,13 +145,7 @@ pip install flask==3.0.0 flask-cors==4.0.0 firebase-admin==6.4.0 gunicorn==21.2.
 
 # Download API app.py from GitHub (raw content)
 echo "Downloading API application..."
-if [ -n "${GITHUB_TOKEN}" ]; then
-    DOWNLOAD_CMD="curl -s -f --max-time 30 --retry 3 --retry-delay 2 -H 'Authorization: token ${GITHUB_TOKEN}'"
-else
-    DOWNLOAD_CMD="curl -s -f --max-time 30 --retry 3 --retry-delay 2"
-fi
-
-if ! $DOWNLOAD_CMD https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/api/app.py -o /opt/playmo-smartdns-api/app.py; then
+if ! curl -s -f --max-time 30 --retry 3 --retry-delay 2 https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/api/app.py -o /opt/playmo-smartdns-api/app.py; then
     echo "ERROR: Failed to download app.py from GitHub. Please SSH into the instance and manually copy the file."
     echo "Creating minimal placeholder to prevent service startup failure..."
     cat > /opt/playmo-smartdns-api/app.py <<'MINIMAL'

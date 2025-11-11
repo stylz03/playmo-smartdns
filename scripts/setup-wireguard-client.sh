@@ -40,46 +40,25 @@ echo ""
 # Download services.json if not present
 if [ ! -f /tmp/services.json ]; then
     echo "Downloading services.json..."
-    GITHUB_TOKEN="${GITHUB_TOKEN:-}"
-    if [ -n "$GITHUB_TOKEN" ]; then
-        curl -s -f --max-time 30 -H "Authorization: token $GITHUB_TOKEN" \
-            https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json \
-            -o /tmp/services.json || echo "Warning: Could not download services.json"
-    else
-        curl -s -f --max-time 30 \
-            https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json \
-            -o /tmp/services.json || echo "Warning: Could not download services.json"
-    fi
+    curl -s -f --max-time 30 \
+        https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/services.json \
+        -o /tmp/services.json || echo "Warning: Could not download services.json"
 fi
 
 # Download scripts if not present
 if [ ! -f /tmp/generate-streaming-ip-ranges.sh ]; then
     echo "Downloading generate-streaming-ip-ranges.sh..."
-    GITHUB_TOKEN="${GITHUB_TOKEN:-}"
-    if [ -n "$GITHUB_TOKEN" ]; then
-        curl -s -f --max-time 30 -H "Authorization: token $GITHUB_TOKEN" \
-            https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/generate-streaming-ip-ranges.sh \
-            -o /tmp/generate-streaming-ip-ranges.sh
-    else
-        curl -s -f --max-time 30 \
-            https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/generate-streaming-ip-ranges.sh \
-            -o /tmp/generate-streaming-ip-ranges.sh
-    fi
+    curl -s -f --max-time 30 \
+        https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/generate-streaming-ip-ranges.sh \
+        -o /tmp/generate-streaming-ip-ranges.sh
     chmod +x /tmp/generate-streaming-ip-ranges.sh
 fi
 
 if [ ! -f /tmp/generate-wireguard-client-config.sh ]; then
     echo "Downloading generate-wireguard-client-config.sh..."
-    GITHUB_TOKEN="${GITHUB_TOKEN:-}"
-    if [ -n "$GITHUB_TOKEN" ]; then
-        curl -s -f --max-time 30 -H "Authorization: token $GITHUB_TOKEN" \
-            https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/generate-wireguard-client-config.sh \
-            -o /tmp/generate-wireguard-client-config.sh
-    else
-        curl -s -f --max-time 30 \
-            https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/generate-wireguard-client-config.sh \
-            -o /tmp/generate-wireguard-client-config.sh
-    fi
+    curl -s -f --max-time 30 \
+        https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/scripts/generate-wireguard-client-config.sh \
+        -o /tmp/generate-wireguard-client-config.sh
     chmod +x /tmp/generate-wireguard-client-config.sh
 fi
 
