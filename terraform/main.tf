@@ -18,11 +18,18 @@ locals {
   domain_list       = [for k, v in local.streaming_domains : k if v]
   us_cdn_ips        = jsondecode(file("${path.module}/us-cdn-ips.json"))
   
-  # Note: named_conf_local and eip_public_ip are defined later after EIP resources are created
-  
-  # Generate zone file contents for streaming domains
-  # Resolve to EC2 Elastic IP so traffic flows through sniproxy
-  # Note: eip_public_ip is defined later in locals block after EIP resources
+  # Generate BIND9 zone configuration
+  # Resolve streaming domains to EC2 Elastic IP so traffic flows through sniproxy
+  # Note: We'll use a placeholder IP here, then update with actual EIP in the second locals block
+  named_conf_local = join("\n\n", [
+    for d in local.domain_list :
+    <<EOT
+zone "${d}" {
+    type master;
+    file "/etc/bind/zones/db.${replace(d, ".", "_")}";
+};
+EOT
+  ])
   
   # BIND9 options optimized for US-based SmartDNS
   # Since EC2 is in us-east-2 (Ohio, USA), queries from BIND9 will appear
