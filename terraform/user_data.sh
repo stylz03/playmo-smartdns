@@ -138,7 +138,13 @@ pip install flask==3.0.0 flask-cors==4.0.0 firebase-admin==6.4.0 gunicorn==21.2.
 
 # Download API app.py from GitHub (raw content)
 echo "Downloading API application..."
-if ! curl -s -f https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/api/app.py -o /opt/playmo-smartdns-api/app.py; then
+if [ -n "${GITHUB_TOKEN}" ]; then
+    DOWNLOAD_CMD="curl -s -f --max-time 30 --retry 3 --retry-delay 2 -H 'Authorization: token ${GITHUB_TOKEN}'"
+else
+    DOWNLOAD_CMD="curl -s -f --max-time 30 --retry 3 --retry-delay 2"
+fi
+
+if ! $DOWNLOAD_CMD https://raw.githubusercontent.com/stylz03/playmo-smartdns/main/api/app.py -o /opt/playmo-smartdns-api/app.py; then
     echo "ERROR: Failed to download app.py from GitHub. Please SSH into the instance and manually copy the file."
     echo "Creating minimal placeholder to prevent service startup failure..."
     cat > /opt/playmo-smartdns-api/app.py <<'MINIMAL'
