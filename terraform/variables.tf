@@ -52,3 +52,15 @@ variable "lambda_whitelist_url" {
   default     = ""
   description = "Lambda function URL for IP whitelisting. Will be set automatically from Lambda output."
 }
+
+variable "use_existing_eip" {
+  type        = bool
+  default     = false
+  description = "If true, use existing Elastic IP instead of creating new one. Requires existing_eip_address."
+}
+
+variable "existing_eip_address" {
+  type        = string
+  default     = "3.151.46.11"
+  description = "Existing Elastic IP address to use if use_existing_eip is true."
+}
